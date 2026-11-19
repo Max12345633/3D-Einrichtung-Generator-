@@ -87,7 +87,8 @@ export function applyStyle(plan: Plan, id: StyleId): Plan {
   const counters: Partial<Record<MaterialRole, number>> = {};
   const furniture = plan.furniture.map((f) => {
     const entry = CATALOG_BY_ID[f.catalogId];
-    if (!entry) return f;
+    // Importierte Shop-Möbel behalten ihre echte Farbe – man will ja genau dieses Produkt sehen
+    if (!entry || entry.source) return f;
     const i = counters[entry.material] ?? 0;
     counters[entry.material] = i + 1;
     const color = roleColor(style, entry.material, i);

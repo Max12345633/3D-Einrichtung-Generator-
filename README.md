@@ -16,6 +16,7 @@ Web-App, mit der man aus einem Grundriss in Minuten eine begehbare 3D-Wohnung ma
 - **3D-Ansicht** mit echten Wandöffnungen und Schatten, Möbel auch in 3D verschiebbar, „Wände niedrig“
 - **Rundgang** in Augenhöhe (WASD + Maus)
 - **Fotorealistische Bilder, selbst gerendert:** GPU-Path-Tracing (indirektes Licht, weiche Schatten, Reflexionen), Portal-Lichter in Fenstern, Sonne aus Fensterrichtung, 3 Lichtstimmungen, bis 1920 × 1080, KI-Entrauschen (Open Image Denoise via WebGPU) mit Filter-Fallback
+- **Möbel aus Online-Shops einfügen:** Link zur Produktseite einfügen → Name, **Maße**, Farbe, Bild und Preis werden übernommen (schema.org-Daten und typische Shop-Formate wie „B/H/T: 220/85/95 cm“ oder „Liegefläche 180 × 200“). Für Shops, die automatische Abrufe blocken: **Lesezeichen-Knopf** direkt auf der Produktseite. Dazu eine **Einkaufsliste** mit Summe und Shop-Links
 - **7 Einrichtungsstile** (Skandinavisch, Japandi, Industrial …) als ein Klick auf Boden, Wände und Möbelfarben
 - **Echte Materialien:** prozedurale Holzdielen, Fliesen (Bad automatisch), Beton, Stoff mit Glanz, Lack, Metall, Keramik; Sockelleisten
 - Undo/Redo, automatisches Speichern im Browser, Projekt-Export/-Import (JSON), Tastenkürzel
@@ -32,7 +33,13 @@ npm install
 npm run dev
 ```
 
-Dann http://localhost:5173 öffnen. Es wird **kein Server und kein API-Key** benötigt – alles läuft im Browser.
+Dann http://localhost:5173 öffnen. `npm run dev` startet App **und** den kleinen Server (Port 8787), der für den Möbel-Import Produktseiten abruft. Ein API-Key wird nicht benötigt.
+
+### Möbel aus Online-Shops
+
+Links im Katalog: **„Aus Online-Shop einfügen“** → Link einfügen → Werte prüfen (Badges zeigen „aus Shop“ vs. „bitte prüfen“) → platzieren.
+- Viele große Shops blocken Server-Abrufe. Dann den **Lesezeichen-Knopf** aus dem Dialog in die Lesezeichenleiste ziehen und auf der Produktseite anklicken – die Daten werden im eigenen Browser gelesen und an Raumwerk übergeben.
+- Der Server ruft nur auf Nutzeraktion einzelne Seiten ab, mit SSRF-Schutz (keine internen Adressen, Größen-/Zeitlimit). Produktbilder werden nur verlinkt, nicht gespeichert.
 
 ### Foto-Render
 

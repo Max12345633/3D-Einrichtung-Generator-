@@ -7,8 +7,7 @@ Produktplan: `docs/PLAN.md` · Architektur: `docs/ARCHITEKTUR.md` · Bild-KI: `d
 
 ```bash
 npm install            # einmalig (npm workspaces)
-npm run dev            # Web (5173) – mehr braucht es nicht
-npm run dev:api        # optional: API (8787) für externe Bild-KI
+npm run dev            # API (8787, Möbel-Import) + Web (5173, proxy /api)
 npm test               # vitest: core + api
 npm run typecheck      # alle Pakete
 npm run build          # core-Typcheck, API-Bundle (tsup), Web (vite)
@@ -26,10 +25,16 @@ npm run build          # core-Typcheck, API-Bundle (tsup), Web (vite)
 - Neue Abhängigkeiten sparsam; three.js-Code nur in `apps/web/src/viewer` (lazy geladen).
 - Foto-Render: `viewer/photo.ts` (Path-Tracer, Licht-Setup), `viewer/denoise.ts` (OIDN/WebGPU), `viewer/materials.ts` (prozedurale Texturen).
   Objekte, die nur in Echtzeit sichtbar sein sollen (Glas, Hilfsflächen, Echtzeit-Lichter), bekommen `userData={{ noPhoto: true }}`.
+- Shop-Import: Parsing rein in `packages/core/src/productImport.ts` – **jedes neue Shop-Format als HTML-Fixture in
+  `packages/core/test/fixtures/` + Test**. Server-Abruf nur über `safeFetch` (SSRF-Schutz) in `apps/api`.
+  `IMPORT_ALLOW_PRIVATE=1` nur für lokale Tests mit Fixture-Server, niemals in Produktion.
+- Importierte Möbel liegen in `plan.customCatalog`; `registerCatalogEntries` (Store-Listener) macht sie für `CATALOG_BY_ID` sichtbar.
 - Foto-Render ohne GPU testen: `http://localhost:5173/?phototest=8` (nur Dev) rendert klein mit 8 Samples.
 
 ## Roadmap-Aufgaben (Phase 1, in dieser Reihenfolge)
 
+0. Shop-Import: echte Shopseiten (IKEA, OTTO, home24, Westwing, XXXLutz, Amazon) testen und Fixtures ergänzen; DNS-Pinning in safeFetch;
+   GLB-Upload für Herstellermodelle; Affiliate-Links (Awin/Partnerprogramme) für die Einkaufsliste
 1. Foto-Render: Albedo/Normal-Hilfsbilder für OIDN (bessere Texturdetails), Kamera-Presets pro Raum, Batch „alle Räume“
 2. Supabase: Auth (Magic Link + Google), Tabelle `projects` (jsonb plan), Storage für Renders, RLS
 3. Teilen-Links `/p/:slug` (read-only Viewer, OG-Image) – Router einführen (react-router)

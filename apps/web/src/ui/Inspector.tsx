@@ -1,10 +1,10 @@
 import { useMemo } from "react";
-import { Copy, RotateCw, Trash2 } from "lucide-react";
+import { Copy, ExternalLink, RotateCw, ShoppingBag, Trash2 } from "lucide-react";
 import {
-  CATALOG_BY_ID, FLOOR_MATERIALS, INTERIOR_STYLES, STYLE_IDS, applyStyle, detectRooms, setWallLength, updateOpening, updateWall, updateFurniture, wallLength,
+  CATALOG_BY_ID, FLOOR_MATERIALS, INTERIOR_STYLES, STYLE_IDS, applyStyle, detectRooms, removeCustomEntry, setWallLength, shoppingList, updateCustomEntry, updateOpening, updateWall, updateFurniture, wallLength,
 } from "@raumwerk/core";
 import { normalizeAngle, usePlanStore } from "../store/planStore";
-import { formatArea, formatCm } from "../lib/format";
+import { formatArea, formatCm, formatPrice } from "../lib/format";
 
 const WALLS = [
   { label: "Weiß", value: "#f3f1ec" }, { label: "Greige", value: "#ddd5c8" }, { label: "Salbei", value: "#c9d3c0" },
@@ -25,7 +25,25 @@ export function Inspector() {
         <aside className="panel right-panel">
           <h4 className="panel-title">Möbel</h4>
           <h3 className="inspector-name">{entry.name}</h3>
-          <p className="muted">{formatCm(entry.width)} breit · {formatCm(entry.depth)} tief · {formatCm(entry.height)} hoch</p>
+          {entry.source ? (
+            <div className="shop-card">
+              {entry.source.imageUrl && <img src={entry.source.imageUrl} alt="" referrerPolicy="no-referrer" />}
+              <div>
+                <a href={entry.source.url} target="_blank" rel="noopener noreferrer nofollow">{entry.source.shop} <ExternalLink size={12} /></a>
+                {entry.source.price !== undefined && <strong>{formatPrice(entry.source.price, entry.source.currency)}</strong>}
+              </div>
+            </div>
+          ) : (
+            <p className="muted">{formatCm(entry.width)} breit · {formatCm(entry.depth)} tief · {formatCm(entry.height)} hoch</p>
+          )}
+          {entry.source && (
+            <>
+              <NumberField label={`Breite${entry.source.measured?.width ? " · aus Shop" : ""}`} unit="cm" value={entry.width * 100} step={1} min={2} onCommit={(v) => commit((p) => updateCustomEntry(p, entry.id, { width: v / 100 }))} />
+              <NumberField label={`Tiefe${entry.source.measured?.depth ? " · aus Shop" : ""}`} unit="cm" value={entry.depth * 100} step={1} min={2} onCommit={(v) => commit((p) => updateCustomEntry(p, entry.id, { depth: v / 100 }))} />
+              <NumberField label={`Höhe${entry.source.measured?.height ? " · aus Shop" : ""}`} unit="cm" value={entry.height * 100} step={1} min={1} onCommit={(v) => commit((p) => updateCustomEntry(p, entry.id, { height: v / 100 }))} />
+              <p className="muted small">Maße gelten für alle Exemplare dieses Möbels.</p>
+            </>
+          )}
           <Field label={`Drehung ${Math.round((f.rotation * 180) / Math.PI)}°`}>
             <input type="range" min={0} max={360} step={5} value={Math.round((f.rotation * 180) / Math.PI)}
               onChange={(e) => commit((p) => updateFurniture(p, f.id, { rotation: normalizeAngle((Number(e.target.value) * Math.PI) / 180) }))} />
@@ -41,6 +59,11 @@ export function Inspector() {
             <button className="btn ghost" onClick={duplicateSelection}><Copy size={15} /> Duplizieren</button>
           </div>
           <button className="btn danger full" onClick={deleteSelection}><Trash2 size={15} /> Entfernen</button>
+          {entry.source && (
+            <button className="link-btn danger-link" onClick={() => { if (confirm(`„${entry.name}“ mit allen Exemplaren aus dem Projekt entfernen?`)) commit((p) => removeCustomEntry(p, entry.id)); }}>
+              Shop-Möbel komplett aus dem Projekt entfernen
+            </button>
+          )}
         </aside>
       );
     }
@@ -120,6 +143,8 @@ export function Inspector() {
         </Field>
       )}
 
+      <ShoppingList />
+
       <div className="shortcut-list">
         <h4 className="panel-title">Tastenkürzel</h4>
         <dl>
@@ -162,5 +187,33 @@ function NumberField({ label, unit, value, step, min, max, onCommit }: { label: 
         <span>{unit}</span>
       </div>
     </Field>
+  );
+}
+
+/** Einkaufsliste der importierten Möbel – mit Summe und Links zu den Shops. */
+function ShoppingList() {
+  const plan = usePlanStore((s) => s.plan);
+  const list = useMemo(() => shoppingList(plan), [plan]);
+  const { openImport } = usePlanStore.getState();
+  return (
+    <div className="field shopping">
+      <span className="field-label"><ShoppingBag size={13} /> Einkaufsliste</span>
+      {list.items.length === 0 ? (
+        <p className="muted small">Füge Möbel aus Online-Shops ein, um zu sehen, ob sie passen, und was alles zusammen kostet. <button className="link-btn inline" onClick={() => openImport()}>Jetzt einfügen</button></p>
+      ) : (
+        <>
+          <ul>
+            {list.items.map(({ entry, qty }) => (
+              <li key={entry.id}>
+                <a href={entry.source!.url} target="_blank" rel="noopener noreferrer nofollow">{qty > 1 ? `${qty}× ` : ""}{entry.name}</a>
+                <span>{entry.source!.price !== undefined ? formatPrice(entry.source!.price * qty, entry.source!.currency) : "–"}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="shopping-total"><span>Summe</span><strong>{formatPrice(list.total, list.currency)}</strong></div>
+          {list.missingPrices > 0 && <p className="muted small">{list.missingPrices} Artikel ohne Preisangabe.</p>}
+        </>
+      )}
+    </div>
   );
 }

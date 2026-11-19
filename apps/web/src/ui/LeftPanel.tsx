@@ -1,9 +1,9 @@
 import { useMemo, useRef, useState } from "react";
-import { DoorOpen, ImagePlus, MousePointer2, PenLine, Ruler, Search, AppWindow, Magnet } from "lucide-react";
+import { DoorOpen, ImagePlus, MousePointer2, PenLine, Ruler, Search, AppWindow, Magnet, ShoppingBag } from "lucide-react";
 import { CATALOG, CATEGORY_LABELS, type FurnitureCategory } from "@raumwerk/core";
 import { DEFAULT_THICKNESS_OPTIONS, usePlanStore, type Tool } from "../store/planStore";
 import { imageToBackground } from "../lib/files";
-import { formatCm } from "../lib/format";
+import { formatCm, formatPrice } from "../lib/format";
 
 const TOOLS: { id: Tool; label: string; key: string; icon: JSX.Element }[] = [
   { id: "select", label: "Auswählen", key: "V", icon: <MousePointer2 size={18} /> },
@@ -18,7 +18,8 @@ export function LeftPanel() {
   const wallThickness = usePlanStore((s) => s.wallThickness);
   const snapping = usePlanStore((s) => s.snapping);
   const hasBackground = usePlanStore((s) => !!s.plan.background);
-  const { setTool, startPlacing, setWallThickness, toggleSnapping } = usePlanStore.getState();
+  const custom = usePlanStore((s) => s.plan.customCatalog);
+  const { setTool, startPlacing, setWallThickness, toggleSnapping, openImport } = usePlanStore.getState();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<FurnitureCategory | "alle">("alle");
 
@@ -60,6 +61,25 @@ export function LeftPanel() {
 
       <section className="catalog">
         <h4 className="panel-title">Möbel</h4>
+        <button className="btn import-btn full" onClick={() => openImport()}>
+          <ShoppingBag size={16} /> Aus Online-Shop einfügen
+        </button>
+        {custom && custom.length > 0 && (
+          <div className="catalog-list">
+            <span className="field-label">Meine Shop-Möbel</span>
+            {custom.map((e) => (
+              <button key={e.id} className={`catalog-item ${placing === e.id ? "is-active" : ""}`} onClick={() => startPlacing(e.id)} title={e.source?.url}>
+                {e.source?.imageUrl
+                  ? <img className="swatch" src={e.source.imageUrl} alt="" referrerPolicy="no-referrer" style={{ background: e.color }} />
+                  : <span className="swatch" style={{ background: e.color }} />}
+                <span className="catalog-text">
+                  <strong>{e.name}</strong>
+                  <small>{formatCm(e.width)} × {formatCm(e.depth)}{e.source?.price !== undefined ? ` · ${formatPrice(e.source.price, e.source.currency)}` : ""}</small>
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
         <label className="search">
           <Search size={15} />
           <input placeholder="Suchen …" value={query} onChange={(e) => setQuery(e.target.value)} />

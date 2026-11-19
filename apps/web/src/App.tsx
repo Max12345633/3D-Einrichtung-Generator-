@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { usePlanStore } from "./store/planStore";
 import { Editor2D } from "./editor/Editor2D";
 import { TopBar } from "./ui/TopBar";
@@ -6,6 +6,8 @@ import { LeftPanel } from "./ui/LeftPanel";
 import { Inspector } from "./ui/Inspector";
 import { StartScreen } from "./ui/StartScreen";
 import { useShortcuts } from "./lib/useShortcuts";
+import { ImportDialog } from "./ui/ImportDialog";
+import { consumeHashImport } from "./lib/importApi";
 
 // three.js ist groß → erst laden, wenn die 3D-Ansicht gebraucht wird
 const Viewer3D = lazy(() => import("./viewer/Viewer3D").then((m) => ({ default: m.Viewer3D })));
@@ -15,7 +17,22 @@ export function App() {
   const view = usePlanStore((s) => s.view);
   const onboarded = usePlanStore((s) => s.onboarded);
   const [renderOpen, setRenderOpen] = useState(false);
+  const importDialog = usePlanStore((s) => s.importDialog);
   useShortcuts();
+
+  // Lesezeichen-Import: Shopseite öffnet Raumwerk mit #import=…
+  useEffect(() => {
+    const check = () => {
+      const product = consumeHashImport();
+      if (product) {
+        usePlanStore.getState().setOnboarded(true);
+        usePlanStore.getState().openImport(product);
+      }
+    };
+    check();
+    window.addEventListener("hashchange", check);
+    return () => window.removeEventListener("hashchange", check);
+  }, []);
 
   return (
     <div className="app">
@@ -33,6 +50,7 @@ export function App() {
         <Inspector />
       </div>
       {!onboarded && <StartScreen />}
+      {importDialog.open && <ImportDialog key={importDialog.initial?.url ?? "neu"} initial={importDialog.initial} onClose={() => usePlanStore.getState().closeImport()} />}
       {renderOpen && <Suspense fallback={null}><RenderDialog onClose={() => setRenderOpen(false)} /></Suspense>}
     </div>
   );

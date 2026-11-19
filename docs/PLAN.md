@@ -34,7 +34,8 @@ Bestehende Tools wie Planner 5D, Roomle, IKEA Kreativ oder HomeByMe sind entwede
 2. **Maßhaltig *und* fotorealistisch.** Die meisten KI-Einrichter halluzinieren Räume. Wir **rendern selbst** – physikalisch korrektes Path-Tracing im Browser mit KI-Entrauschen. Jedes Bild zeigt exakt die geplante Wohnung, ohne Kosten pro Bild und ohne Upload privater Grundrisse.
 3. **Magnetische Einrichtung.** Möbel docken automatisch an Wände an, Kollisionen werden rot markiert, und Flächen werden live berechnet. Laien machen dadurch keine „unmöglichen“ Pläne.
 4. **Rundgang statt nur Vogelperspektive.** Man kann in Augenhöhe durch die Wohnung laufen, der stärkste „Aha“-Moment.
-5. **Teilen als Kernfunktion.** Jeder Plan wird ein Link oder Clip für Instagram, TikTok und WhatsApp („So wird unsere neue Wohnung“). So entsteht organisches Wachstum.
+5. **Echte Möbel aus jedem Shop.** Link einfügen (oder Lesezeichen-Knopf) → das Wunschsofa steht maßstabsgetreu in der eigenen Wohnung, inkl. Preis und Einkaufsliste. Beantwortet direkt die Frage „Passt das?“ – und ist die natürliche Brücke zu Affiliate-Umsätzen.
+6. **Teilen als Kernfunktion.** Jeder Plan wird ein Link oder Clip für Instagram, TikTok und WhatsApp („So wird unsere neue Wohnung“). So entsteht organisches Wachstum.
 
 ## 4. User Journey (Ziel: „Aha“ in < 3 Minuten)
 
@@ -165,7 +166,7 @@ Kostenkontrolle (falls aktiviert): Credits pro Nutzer, Rate-Limit, Caching. Chec
 | **Umzugs-Pass** | 9,99 € einmalig (3 Monate Plus) | für Einmal-Umzügler (oft die beste Conversion) |
 | **Pro/Makler** | ab 49 €/Monat | Branding, Exposé-Export, Home-Staging, Einbettung, Team |
 
-Weitere Erlösquellen: Affiliate (Möbel), Leads für Handwerker oder Küchenstudios (Phase 3).
+Weitere Erlösquellen: **Affiliate über die Einkaufsliste** (importierte Shop-Möbel → Partnerlinks, z. B. über Awin/Partnerprogramme der Shops; Provisionen typ. 3–10 %), Leads für Handwerker oder Küchenstudios (Phase 3).
 **Unit Economics:** Da die Bilder auf dem Gerät der Nutzer gerendert werden, entstehen **keine variablen Render-Kosten** – die Marge hängt nur an Hosting/Speicher.
 
 ## 9. Go-to-Market über Social Media
@@ -199,6 +200,7 @@ Weitere Erlösquellen: Affiliate (Möbel), Leads für Handwerker oder Küchenstu
 |--------|----------------|
 | Render-Zeit auf schwachen Geräten | Qualitätsstufen, KI-Entrauschen (weniger Samples nötig), später optionaler Cloud-Render |
 | Grundrisserkennung ungenau | Editor bleibt Kern; Erkennung als „Vorschlag“; Nutzerkorrekturen (mit Einwilligung) als Trainingsdaten |
+| Shops blocken Abrufe / Nutzungsbedingungen | Abruf nur einzeln auf Nutzeraktion, Bilder nur verlinkt, Lesezeichen-Knopf (läuft im Browser des Nutzers), mittelfristig offizielle Partner-Feeds/APIs |
 | Urheberrecht an Grundrissen (Exposés, Architektenpläne) | Nutzer versichert Rechte; Bilder bleiben privat; Galerie nur mit Opt-in |
 | DSGVO | EU-Hosting, Datensparsamkeit, AVVs, keine Grundrisse in Logs, Löschfunktion |
 | Performance auf schwachen Handys | prozedurale Low-Poly-Modelle, LOD, Schatten abschaltbar, `dpr`-Begrenzung |

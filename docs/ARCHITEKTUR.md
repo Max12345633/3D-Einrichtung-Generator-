@@ -12,7 +12,9 @@ packages/core/         Reine TypeScript-Logik (keine UI, keine DOM-Abhängigkeit
   src/snapping.ts      Einrasten: Knoten > Wand > Winkel > Raster
   src/furniture.ts     Grundflächen, Kollision (SAT), Wand-Überschneidung
   src/catalog.ts       Möbelkatalog
-  src/prompt.ts        Render-Stile + Prompt-Bau
+  src/prompt.ts        Prompt-Bau (optional, externe Bild-KI)
+  src/productImport.ts Shop-Import: Produktseite → Name/Maße/Preis/Farbe/Möbelart, Einkaufsliste
+  src/styles.ts        Einrichtungsstile (Shop-Möbel behalten ihre echte Farbe)
   test/                vitest
 
 apps/web/              React-Frontend
@@ -26,7 +28,9 @@ apps/web/              React-Frontend
   src/ui/                  TopBar, LeftPanel (Werkzeuge + Katalog), Inspector, StartScreen, RenderDialog
   src/lib/                 API-Client, Datei-Helfer, Formatierung, Tastenkürzel
 
-apps/api/              OPTIONAL – Hono-Server für externe Bild-KI (derzeit nicht genutzt)
+apps/api/              Hono-Server: Möbel-Import (Seiten-/Bild-Abruf mit SSRF-Schutz), optional externe Bild-KI
+  src/safeFetch.ts     Abruf fremder URLs: nur öffentliche IPs, Redirects geprüft, Größen-/Zeitlimit
+  src/importRoutes.ts  POST /api/import/product, GET /api/import/image
   src/app.ts           Routen: /api/health, /api/render, /api/render/:id, /api/uploads/:id
   src/providers/       RenderProvider-Interface, MockProvider, HiggsfieldProvider
   src/uploads.ts       Flüchtiger Bildspeicher (→ R2/S3)
@@ -66,3 +70,19 @@ Live-Szene (react-three-fiber)
 
 Wichtig: Der Path-Tracer unterstützt Rect-, Punkt-, Spot- und Richtungslichter, aber **keine** Hemisphären-/Ambient-Lichter
 und **keine** PMREM-Umgebungen – deshalb das eigene Licht-Setup in `photo.ts`.
+
+## Möbel-Import aus Online-Shops
+
+```
+Link  ──► POST /api/import/product ──► safeFetch (SSRF-Schutz) ──► parseProductHtml (core)
+                                                                    ├─ schema.org JSON-LD (Name, Bild, Preis, Farbe, Maße)
+                                                                    ├─ Meta-Tags (og:, product:price)
+                                                                    └─ Text: „Breite: 228 cm“, „B/H/T: …“, „Liegefläche …“
+Lesezeichen-Knopf (auf der Shopseite) ──► #import={u,h} ──► parseProductHtml im Browser
+                                                    │
+ImportDialog: prüfen/ändern (+ Farbe aus Produktfoto via /api/import/image) ──► productToCatalogEntry
+  ──► plan.customCatalog + registerCatalogEntries ──► wie jedes Katalogmöbel (2D, 3D, Kollision, Foto)
+```
+
+Offen für Produktion: DNS-Pinning gegen Rebinding (undici Agent mit geprüfter IP), Caching pro URL,
+Shop-spezifische Parser für Seiten ohne Strukturdaten, Partner-/Affiliate-APIs als offizielle Datenquelle.

@@ -11,6 +11,17 @@ export type MaterialRole = "fabric" | "wood" | "lacquer" | "metal" | "ceramic" |
 
 export type FurnitureCategory = "wohnen" | "schlafen" | "essen" | "arbeiten" | "kueche" | "bad" | "deko";
 
+/** Herkunft eines aus einem Online-Shop importierten Möbelstücks. */
+export interface ProductSource {
+  url: string;
+  shop: string;
+  imageUrl?: string;
+  price?: number;
+  currency?: string;
+  /** Welche Maße aus der Shopseite stammen (Rest: Schätzung/Nutzereingabe) */
+  measured?: { width: boolean; depth: boolean; height: boolean };
+}
+
 export interface CatalogEntry {
   id: string;
   name: string;
@@ -25,6 +36,8 @@ export interface CatalogEntry {
   material: MaterialRole;
   /** Beschreibung für Render-Prompts */
   promptHint: string;
+  /** Nur bei importierten Möbeln */
+  source?: ProductSource;
 }
 
 export const CATEGORY_LABELS: Record<FurnitureCategory, string> = {
@@ -59,4 +72,15 @@ export const CATALOG: CatalogEntry[] = [
   { id: "sink", material: "ceramic", name: "Waschtisch", category: "bad", shape: "sink", width: 0.8, depth: 0.48, height: 0.85, color: "#ffffff", promptHint: "vanity with washbasin" },
 ];
 
+/**
+ * Nachschlagetabelle für alle Möbel: eingebaute + die des aktuellen Projekts (importierte).
+ * Projektspezifische Einträge werden über registerCatalogEntries() eingetragen – der Store ruft das
+ * bei jeder Planänderung auf. So funktionieren alle Funktionen (Kollision, 3D, Stile …) ohne Sonderfälle.
+ */
 export const CATALOG_BY_ID: Record<string, CatalogEntry> = Object.fromEntries(CATALOG.map((e) => [e.id, e]));
+
+export function registerCatalogEntries(entries: readonly CatalogEntry[] | undefined): void {
+  for (const e of entries ?? []) CATALOG_BY_ID[e.id] = e;
+}
+
+export const isCustomEntry = (e: CatalogEntry | undefined): boolean => !!e?.source;

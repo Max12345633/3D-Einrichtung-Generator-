@@ -3,14 +3,22 @@
   "private": true,
   "version": "0.1.0",
   "description": "Grundriss rein, 3D-Wohnung raus, einrichten, fotorealistisch rendern.",
-  "workspaces": ["packages/*", "apps/*"],
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
-    "dev": "npm run dev -w @raumwerk/web",
+    "dev": "concurrently -k -n api,web -c yellow,cyan \"npm run dev -w @raumwerk/api\" \"npm run dev -w @raumwerk/web\"",
     "dev:web": "npm run dev -w @raumwerk/web",
     "dev:api": "npm run dev -w @raumwerk/api",
     "build": "npm run build -w @raumwerk/core && npm run build -w @raumwerk/api && npm run build -w @raumwerk/web",
     "test": "npm run test -w @raumwerk/core && npm run test -w @raumwerk/api",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
-  "engines": { "node": ">=22" }
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
 }

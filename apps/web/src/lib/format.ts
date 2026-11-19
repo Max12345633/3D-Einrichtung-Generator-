@@ -4,3 +4,11 @@ const nf2 = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 2, maximumFr
 export const formatArea = (m2: number) => `${nf1.format(m2)} m²`;
 export const formatLength = (m: number) => (m < 1 ? `${Math.round(m * 100)} cm` : `${nf2.format(m)} m`);
 export const formatCm = (m: number) => `${Math.round(m * 100)} cm`;
+
+export function formatPrice(value: number, currency = "EUR"): string {
+  try {
+    return new Intl.NumberFormat("de-DE", { style: "currency", currency }).format(value);
+  } catch {
+    return `${value.toFixed(2).replace(".", ",")} ${currency}`;
+  }
+}

@@ -1,4 +1,4 @@
-import { CATALOG_BY_ID } from "./catalog";
+import { CATALOG_BY_ID, registerCatalogEntries, type CatalogEntry } from "./catalog";
 import { createId } from "./ids";
 import { distance, projectOnSegment, sub } from "./math";
 import type { FurnitureItem, Opening, Plan, Vec2, Wall } from "./types";
@@ -122,4 +122,41 @@ export function snapFurnitureToWall(item: FurnitureItem, walls: Wall[], reach = 
     rotation: Math.atan2(-n.x, n.y),
     position: { x: hit.point.x + n.x * off, y: hit.point.y + n.y * off },
   };
+}
+
+// ---------- Importierte Möbel (eigener Katalog des Projekts) ----------
+
+export function addCustomEntry(plan: Plan, entry: CatalogEntry): Plan {
+  registerCatalogEntries([entry]);
+  return touch({ ...plan, customCatalog: [...(plan.customCatalog ?? []).filter((e) => e.id !== entry.id), entry] });
+}
+
+/** Ändert Maße/Name/Farbe eines importierten Möbels – alle platzierten Exemplare passen sich an. */
+export function updateCustomEntry(plan: Plan, id: string, patch: Partial<Pick<CatalogEntry, "name" | "width" | "depth" | "height" | "color" | "shape">>): Plan {
+  const list = plan.customCatalog ?? [];
+  const current = list.find((e) => e.id === id);
+  if (!current) return plan;
+  const next: CatalogEntry = { ...current, ...patch };
+  if (next.source && (patch.width !== undefined || patch.depth !== undefined || patch.height !== undefined)) {
+    const m = next.source.measured ?? { width: false, depth: false, height: false };
+    next.source = {
+      ...next.source,
+      measured: {
+        width: patch.width !== undefined ? false : m.width,
+        depth: patch.depth !== undefined ? false : m.depth,
+        height: patch.height !== undefined ? false : m.height,
+      },
+    };
+  }
+  registerCatalogEntries([next]);
+  return touch({ ...plan, customCatalog: list.map((e) => (e.id === id ? next : e)) });
+}
+
+/** Entfernt ein importiertes Möbel samt aller platzierten Exemplare. */
+export function removeCustomEntry(plan: Plan, id: string): Plan {
+  return touch({
+    ...plan,
+    customCatalog: (plan.customCatalog ?? []).filter((e) => e.id !== id),
+    furniture: plan.furniture.filter((f) => f.catalogId !== id),
+  });
 }

@@ -1,8 +1,8 @@
 import { create } from "zustand";
 import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
 import {
-  DEFAULT_WALL_HEIGHT, DEFAULT_WALL_THICKNESS, addFurniture, addOpening, addWall, emptyPlan, parsePlan,
-  removeById, samplePlan, updateFurniture, type Opening, type Plan, type Vec2,
+  DEFAULT_WALL_HEIGHT, DEFAULT_WALL_THICKNESS, addCustomEntry, addFurniture, addOpening, addWall, emptyPlan, parsePlan,
+  registerCatalogEntries, removeById, samplePlan, updateFurniture, type CatalogEntry, type Opening, type Plan, type ProductInfo, type Vec2,
 } from "@raumwerk/core";
 
 export type Tool = "select" | "wall" | "door" | "window" | "furniture" | "calibrate";
@@ -28,6 +28,10 @@ interface PlanState {
   snapping: boolean;
   onboarded: boolean;
   walkMode: boolean;
+  /** Import-Dialog (nicht persistiert); initial = vorbefülltes Produkt (Lesezeichen-Import) */
+  importDialog: { open: boolean; initial: ProductInfo | null };
+  openImport: (initial?: ProductInfo | null) => void;
+  closeImport: () => void;
 
   /** Änderung mit Undo-Eintrag */
   commit: (recipe: (p: Plan) => Plan) => void;
@@ -53,6 +57,8 @@ interface PlanState {
   drawWall: (a: Vec2, b: Vec2) => void;
   placeOpening: (kind: Opening["kind"], at: Vec2) => boolean;
   placeFurniture: (catalogId: string, at: Vec2, rotation?: number) => void;
+  /** Importiertes Shop-Möbel ins Projekt übernehmen und direkt zum Platzieren bereitstellen */
+  importEntry: (entry: CatalogEntry) => void;
   deleteSelection: () => void;
   rotateSelection: (delta: number) => void;
   duplicateSelection: () => void;
@@ -82,6 +88,9 @@ export const usePlanStore = create<PlanState>()(
       snapping: true,
       onboarded: false,
       walkMode: false,
+      importDialog: { open: false, initial: null },
+      openImport: (initial = null) => set({ importDialog: { open: true, initial } }),
+      closeImport: () => set({ importDialog: { open: false, initial: null } }),
 
       commit: (recipe) => {
         const { plan, past } = get();
@@ -130,6 +139,10 @@ export const usePlanStore = create<PlanState>()(
         if (!res.item) return;
         get().commit(() => res.plan);
         set({ selection: { kind: "furniture", id: res.item.id }, placing: null, tool: "select" });
+      },
+      importEntry: (entry) => {
+        get().commit((p) => addCustomEntry(p, entry));
+        set({ placing: entry.id, tool: "furniture", selection: null, view: get().view === "3d" ? "split" : get().view });
       },
       deleteSelection: () => {
         const sel = get().selection;
@@ -190,3 +203,10 @@ export const DEFAULT_THICKNESS_OPTIONS = [
   { label: "Tragwand 24 cm", value: 0.24 },
   { label: "Außenwand 30 cm", value: 0.3 },
 ];
+
+// Importierte Möbel des aktuellen Plans im Katalog bekannt machen – vor jedem Rendern,
+// da dieser Listener vor den React-Komponenten registriert wird.
+registerCatalogEntries(usePlanStore.getState().plan.customCatalog);
+usePlanStore.subscribe((state, prev) => {
+  if (state.plan.customCatalog !== prev.plan.customCatalog) registerCatalogEntries(state.plan.customCatalog);
+});

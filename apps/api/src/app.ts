@@ -8,6 +8,7 @@ import type { RenderProvider } from "./providers/types";
 import { RateLimiter } from "./rateLimit";
 import { UploadError, UploadStore } from "./uploads";
 import { ProviderError } from "./providers/higgsfield";
+import { importRoutes, type ImportDeps } from "./importRoutes";
 
 const renderBody = z.object({
   plan: z.unknown(),
@@ -19,12 +20,14 @@ const renderBody = z.object({
 
 export interface AppDeps {
   env: Env;
-  provider: RenderProvider;
+  /** Optional: externe Bild-KI. Ohne Provider sind die /api/render-Routen deaktiviert. */
+  provider?: RenderProvider;
   uploads?: UploadStore;
+  importDeps?: ImportDeps;
   limiter?: RateLimiter;
 }
 
-export function createApp({ env, provider, uploads = new UploadStore(), limiter }: AppDeps) {
+export function createApp({ env, provider, uploads = new UploadStore(), limiter, importDeps }: AppDeps) {
   const rl = limiter ?? new RateLimiter(env.RATE_LIMIT_PER_HOUR, 60 * 60 * 1000);
   const app = new Hono();
 
@@ -40,7 +43,12 @@ export function createApp({ env, provider, uploads = new UploadStore(), limiter 
     return c.json({ error: "Interner Fehler" }, 500);
   });
 
-  app.get("/api/health", (c) => c.json({ ok: true, provider: provider.name }));
+  app.get("/api/health", (c) => c.json({ ok: true, provider: provider?.name ?? null }));
+
+  // Möbel aus Online-Shops importieren
+  app.route("/api/import", importRoutes({ allowPrivate: env.IMPORT_ALLOW_PRIVATE, ...importDeps }));
+
+  if (!provider) return app;
 
   app.get("/api/uploads/:id", (c) => {
     const img = uploads.get(c.req.param("id"));

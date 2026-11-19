@@ -5,6 +5,29 @@ import type { Opening, Plan, Wall } from "./types";
 
 const vec2 = z.object({ x: z.number().finite(), y: z.number().finite() });
 
+const SHAPES = ["sofa", "armchair", "bed", "table", "chair", "desk", "wardrobe", "shelf", "sideboard", "tv", "rug", "plant", "lamp", "kitchen", "fridge", "bathtub", "shower", "toilet", "sink", "nightstand"] as const;
+
+export const catalogEntrySchema = z.object({
+  id: z.string().min(1).max(80),
+  name: z.string().min(1).max(200),
+  category: z.enum(["wohnen", "schlafen", "essen", "arbeiten", "kueche", "bad", "deko"]),
+  material: z.enum(["fabric", "wood", "lacquer", "metal", "ceramic", "plant", "textile"]),
+  shape: z.enum(SHAPES),
+  width: z.number().min(0.05).max(8),
+  depth: z.number().min(0.05).max(8),
+  height: z.number().min(0.005).max(5),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  promptHint: z.string().max(300),
+  source: z.object({
+    url: z.string().url().max(2000),
+    shop: z.string().max(120),
+    imageUrl: z.string().url().max(2000).optional(),
+    price: z.number().nonnegative().max(1_000_000).optional(),
+    currency: z.string().max(8).optional(),
+    measured: z.object({ width: z.boolean(), depth: z.boolean(), height: z.boolean() }).optional(),
+  }).optional(),
+});
+
 export const planSchema = z.object({
   version: z.literal(1),
   id: z.string().min(1),
@@ -24,6 +47,7 @@ export const planSchema = z.object({
   floorColor: z.string(),
   floorMaterial: z.enum(["oak-light", "oak-dark", "walnut", "concrete", "tiles-light", "tiles-dark"]).optional(),
   wallColor: z.string(),
+  customCatalog: z.array(catalogEntrySchema).max(500).optional(),
   background: z.object({
     dataUrl: z.string(), widthPx: z.number().positive(), heightPx: z.number().positive(), metersPerPixel: z.number().positive(), origin: vec2, opacity: z.number().min(0).max(1),
   }).optional(),

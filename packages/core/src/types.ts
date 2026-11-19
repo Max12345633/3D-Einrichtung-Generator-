@@ -1,3 +1,5 @@
+import type { CatalogEntry } from "./catalog";
+
 /**
  * Domänenmodell. Alle Längen in METERN, Winkel in RADIANT.
  * 2D-Koordinaten (x, y) des Grundrisses entsprechen im 3D-Raum (x, z); y ist dort die Höhe.
@@ -66,5 +68,7 @@ export interface Plan {
   floorMaterial?: FloorMaterial;
   wallColor: string;
   background?: BackgroundImage;
+  /** Aus Online-Shops importierte Möbel dieses Projekts */
+  customCatalog?: CatalogEntry[];
   updatedAt: string;
 }

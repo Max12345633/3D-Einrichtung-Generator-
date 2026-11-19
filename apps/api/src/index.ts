@@ -7,7 +7,8 @@ import type { RenderProvider } from "./providers/types";
 
 const env = loadEnv();
 
-function createProvider(): RenderProvider {
+function createProvider(): RenderProvider | undefined {
+  if (env.RENDER_PROVIDER === "none") return undefined;
   if (env.RENDER_PROVIDER === "mock") return new MockProvider();
   if (!env.HIGGSFIELD_API_KEY) throw new Error("RENDER_PROVIDER=higgsfield braucht HIGGSFIELD_API_KEY");
   if (!env.PUBLIC_BASE_URL) throw new Error("RENDER_PROVIDER=higgsfield braucht PUBLIC_BASE_URL (Higgsfield lädt das Referenzbild per URL)");
@@ -22,5 +23,6 @@ function createProvider(): RenderProvider {
 
 const provider = createProvider();
 serve({ fetch: createApp({ env, provider }).fetch, port: env.PORT }, (info) => {
-  console.log(`API läuft auf http://localhost:${info.port} (Bilddienst: ${provider.name})`);
+  console.log(`API läuft auf http://localhost:${info.port} (Möbel-Import aktiv, externe Bild-KI: ${provider?.name ?? "aus"})`);
+  if (env.IMPORT_ALLOW_PRIVATE) console.warn("⚠ IMPORT_ALLOW_PRIVATE=1 – interne Adressen erlaubt. Nur für lokale Tests!");
 });
