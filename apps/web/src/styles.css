@@ -310,3 +310,4 @@ input[aria-invalid="true"] { border-color: #e7a5a7; }
 }
 .import-review > *, .dims-row > *, .import-form .field { min-width: 0; }
 .dims-row .input-row span { width: auto; }
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 80; background: #1d1f1e; color: #fff; padding: 10px 16px; border-radius: 12px; font-size: 13.5px; box-shadow: var(--shadow-lg); max-width: calc(100% - 32px); }

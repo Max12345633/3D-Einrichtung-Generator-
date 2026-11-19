@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Copy, ExternalLink, RotateCw, ShoppingBag, Trash2 } from "lucide-react";
 import {
   CATALOG_BY_ID, FLOOR_MATERIALS, INTERIOR_STYLES, STYLE_IDS, applyStyle, detectRooms, removeCustomEntry, setWallLength, shoppingList, updateCustomEntry, updateOpening, updateWall, updateFurniture, wallLength,
@@ -60,9 +60,7 @@ export function Inspector() {
           </div>
           <button className="btn danger full" onClick={deleteSelection}><Trash2 size={15} /> Entfernen</button>
           {entry.source && (
-            <button className="link-btn danger-link" onClick={() => { if (confirm(`„${entry.name}“ mit allen Exemplaren aus dem Projekt entfernen?`)) commit((p) => removeCustomEntry(p, entry.id)); }}>
-              Shop-Möbel komplett aus dem Projekt entfernen
-            </button>
+            <RemoveCustomButton onConfirm={() => commit((p) => removeCustomEntry(p, entry.id))} />
           )}
         </aside>
       );
@@ -157,6 +155,19 @@ export function Inspector() {
         </dl>
       </div>
     </aside>
+  );
+}
+
+/** Zweistufige Bestätigung im Panel (confirm() wird in Sandboxes nicht angezeigt). */
+function RemoveCustomButton({ onConfirm }: { onConfirm: () => void }) {
+  const [armed, setArmed] = useState(false);
+  return armed ? (
+    <div className="row">
+      <button className="btn danger" onClick={onConfirm}>Ja, alle Exemplare entfernen</button>
+      <button className="btn ghost" onClick={() => setArmed(false)}>Abbrechen</button>
+    </div>
+  ) : (
+    <button className="link-btn danger-link" onClick={() => setArmed(true)}>Shop-Möbel komplett aus dem Projekt entfernen</button>
   );
 }
 

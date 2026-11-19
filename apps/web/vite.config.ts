@@ -2,6 +2,8 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig({
+  // Relative Pfade: läuft auch in einem Unterordner / auf statischem Hosting
+  base: "./",
   plugins: [react()],
   server: {
     port: 5173,

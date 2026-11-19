@@ -31,6 +31,9 @@ interface PlanState {
   /** Import-Dialog (nicht persistiert); initial = vorbefülltes Produkt (Lesezeichen-Import) */
   importDialog: { open: boolean; initial: ProductInfo | null };
   openImport: (initial?: ProductInfo | null) => void;
+  /** Kurze Hinweismeldung unten im Bild (statt alert, das in Sandboxes nicht angezeigt wird) */
+  notice: { id: number; text: string } | null;
+  notify: (text: string) => void;
   closeImport: () => void;
 
   /** Änderung mit Undo-Eintrag */
@@ -89,6 +92,8 @@ export const usePlanStore = create<PlanState>()(
       onboarded: false,
       walkMode: false,
       importDialog: { open: false, initial: null },
+      notice: null,
+      notify: (text) => set({ notice: { id: Date.now(), text } }),
       openImport: (initial = null) => set({ importDialog: { open: true, initial } }),
       closeImport: () => set({ importDialog: { open: false, initial: null } }),
 

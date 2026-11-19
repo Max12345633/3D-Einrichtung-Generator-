@@ -38,7 +38,7 @@ Dann http://localhost:5173 öffnen. `npm run dev` startet App **und** den kleine
 ### Möbel aus Online-Shops
 
 Links im Katalog: **„Aus Online-Shop einfügen“** → Link einfügen → Werte prüfen (Badges zeigen „aus Shop“ vs. „bitte prüfen“) → platzieren.
-- Viele große Shops blocken Server-Abrufe. Dann den **Lesezeichen-Knopf** aus dem Dialog in die Lesezeichenleiste ziehen und auf der Produktseite anklicken – die Daten werden im eigenen Browser gelesen und an Raumwerk übergeben.
+- Viele große Shops blocken Server-Abrufe. Dann den **Lesezeichen-Knopf** aus dem Dialog in die Lesezeichenleiste ziehen, auf der Produktseite anklicken (kopiert die Produktdaten) und im Raumwerk-Dialog mit Strg+V einfügen. Funktioniert auch ohne Server, z. B. in einer statisch gehosteten Version.
 - Der Server ruft nur auf Nutzeraktion einzelne Seiten ab, mit SSRF-Schutz (keine internen Adressen, Größen-/Zeitlimit). Produktbilder werden nur verlinkt, nicht gespeichert.
 
 ### Foto-Render

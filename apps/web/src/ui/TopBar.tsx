@@ -20,7 +20,7 @@ export function TopBar({ onRender }: { onRender: () => void }) {
   return (
     <header className="topbar">
       <div className="brand">
-        <img src="/favicon.svg" alt="" width={28} height={28} />
+        <img src="./favicon.svg" alt="" width={28} height={28} />
         <span className="brand-name">Raumwerk</span>
       </div>
 
@@ -55,7 +55,7 @@ export function TopBar({ onRender }: { onRender: () => void }) {
             const file = e.target.files?.[0];
             e.target.value = "";
             if (!file) return;
-            try { importJson(await file.text()); } catch { alert("Die Datei ist kein gültiges Raumwerk-Projekt."); }
+            try { importJson(await file.text()); } catch { usePlanStore.getState().notify("Die Datei ist kein gültiges Raumwerk-Projekt."); }
           }}
         />
         <button className="btn primary render-btn" onClick={onRender}>

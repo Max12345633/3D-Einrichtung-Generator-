@@ -4,7 +4,7 @@ import {
   CATALOG, defaultDimensions, guessKind, productToCatalogEntry, shopName, type FurnitureShape, type ProductInfo,
 } from "@raumwerk/core";
 import { usePlanStore } from "../store/planStore";
-import { bookmarkletCode, dominantColor, importProduct, ImportError } from "../lib/importApi";
+import { bookmarkletCode, dominantColor, importProduct, ImportError, parseClipboardImport } from "../lib/importApi";
 import { formatPrice } from "../lib/format";
 
 export const SHAPE_LABELS: Record<FurnitureShape, string> = {
@@ -60,10 +60,11 @@ export function ImportDialog({ initial, onClose }: { initial?: ProductInfo | nul
   const [colorFromImage, setColorFromImage] = useState(false);
   const abort = useRef<AbortController | null>(null);
   const bookmarkRef = useRef<HTMLAnchorElement>(null);
+  const [dragHint, setDragHint] = useState(false);
 
   useEffect(() => {
     // javascript:-URL per DOM setzen (React würde davor warnen)
-    bookmarkRef.current?.setAttribute("href", bookmarkletCode(location.origin));
+    bookmarkRef.current?.setAttribute("href", bookmarkletCode());
   }, [phase.kind]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -84,7 +85,30 @@ export function ImportDialog({ initial, onClose }: { initial?: ProductInfo | nul
     return () => { alive = false; };
   }, [product]);
 
+  /** Vom Lesezeichen kopierte Daten → direkt zur Prüfung */
+  const tryClipboardData = (text: string): boolean => {
+    const p = parseClipboardImport(text);
+    if (!p) return false;
+    setUrl("");
+    setForm(formFor(p));
+    setColorFromImage(false);
+    const d = p.dimensions;
+    setPhase({ kind: "review", product: p, warnings: d.width && d.depth && d.height ? [] : ["Nicht alle Maße gefunden – bitte prüfen und ergänzen."] });
+    return true;
+  };
+
+  // Einfügen (Strg+V) irgendwo im Dialog
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const text = e.clipboardData?.getData("text") ?? "";
+      if (tryClipboardData(text)) e.preventDefault();
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  });
+
   const load = async () => {
+    if (tryClipboardData(url)) return;
     const trimmed = url.trim();
     if (!/^https?:\/\/\S+\.\S+/.test(trimmed)) return setPhase({ kind: "link", error: "Bitte den kompletten Link zur Produktseite einfügen (beginnt mit https://).", code: "invalid" });
     abort.current = new AbortController();
@@ -151,7 +175,7 @@ export function ImportDialog({ initial, onClose }: { initial?: ProductInfo | nul
             <form className="import-link" onSubmit={(e) => { e.preventDefault(); void load(); }}>
               <label className="search grow">
                 <Link2 size={16} />
-                <input autoFocus type="url" placeholder="https://www.shop.de/produkt/…" value={url} onChange={(e) => setUrl(e.target.value)} disabled={phase.kind === "loading"} />
+                <input autoFocus type="text" inputMode="url" placeholder="https://www.shop.de/produkt/…" value={url} onChange={(e) => setUrl(e.target.value)} disabled={phase.kind === "loading"} />
               </label>
               <button className="btn primary" type="submit" disabled={phase.kind === "loading" || !url.trim()}>
                 {phase.kind === "loading" ? <><Loader2 className="spin" size={15} /> Lese Seite …</> : "Übernehmen"}
@@ -166,9 +190,10 @@ export function ImportDialog({ initial, onClose }: { initial?: ProductInfo | nul
             <div className="bookmarklet">
               <div>
                 <strong><Bookmark size={15} /> Für Shops, die blockieren: der Lesezeichen-Knopf</strong>
-                <p className="muted small">Zieh den Knopf einmal in deine Lesezeichenleiste. Auf einer Produktseite draufklicken, schon öffnet sich Raumwerk mit dem Möbel. Läuft komplett in deinem Browser.</p>
+                <p className="muted small">1. Zieh den Knopf einmal in deine Lesezeichenleiste. 2. Auf der Produktseite im Shop anklicken, dann sind die Daten kopiert. 3. Hier mit Strg+V (Mac: Cmd+V) einfügen. Läuft komplett in deinem Browser.</p>
+                {dragHint && <p className="warn-text">Nicht klicken, sondern mit der Maus in die Lesezeichenleiste ziehen (Leiste einblenden: Strg+Shift+B).</p>}
               </div>
-              <a ref={bookmarkRef} className="btn ghost bookmarklet-btn" onClick={(e) => { e.preventDefault(); alert("Zieh den Knopf in deine Lesezeichenleiste und klicke ihn dann auf einer Produktseite an."); }} draggable>
+              <a ref={bookmarkRef} className="btn ghost bookmarklet-btn" onClick={(e) => { e.preventDefault(); setDragHint(true); }} draggable>
                 ＋ Zu Raumwerk
               </a>
             </div>

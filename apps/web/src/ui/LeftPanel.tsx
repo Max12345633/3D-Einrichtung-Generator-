@@ -138,7 +138,7 @@ export function BackgroundUpload({ big = false, onDone }: { big?: boolean; onDon
             window.dispatchEvent(new Event("raumwerk:fit"));
             onDone?.();
           } catch {
-            alert("Das Bild konnte nicht gelesen werden.");
+            usePlanStore.getState().notify("Das Bild konnte nicht gelesen werden. Bitte JPG, PNG oder WebP verwenden.");
           } finally {
             setBusy(false);
           }
