@@ -28,11 +28,14 @@ npm run build          # core-Typcheck, API-Bundle (tsup), Web (vite)
 - Shop-Import: Parsing rein in `packages/core/src/productImport.ts` – **jedes neue Shop-Format als HTML-Fixture in
   `packages/core/test/fixtures/` + Test**. Server-Abruf nur über `safeFetch` (SSRF-Schutz) in `apps/api`.
   `IMPORT_ALLOW_PRIVATE=1` nur für lokale Tests mit Fixture-Server, niemals in Produktion.
+- Wanderkennung aus Bildern: `packages/core/src/floorplanDetect.ts` (Bildanalyse) + `floorplanImport.ts` (Pixel → Meter, Maßstab).
+  Neue Grundriss-Stile als synthetisches Testbild in `test/floorplan.test.ts` abdecken. `addWall` teilt in beide Richtungen an T-Stößen.
 - Importierte Möbel liegen in `plan.customCatalog`; `registerCatalogEntries` (Store-Listener) macht sie für `CATALOG_BY_ID` sichtbar.
 - Foto-Render ohne GPU testen: `http://localhost:5173/?phototest=8` (nur Dev) rendert klein mit 8 Samples.
 
 ## Roadmap-Aufgaben (Phase 1, in dieser Reihenfolge)
 
+0. Wanderkennung: schräge Wände, Grundrisse mit nur umrandeten (nicht gefüllten) Wänden, PDF-Upload (pdf.js), Raumnamen per OCR
 0. Shop-Import: echte Shopseiten (IKEA, OTTO, home24, Westwing, XXXLutz, Amazon) testen und Fixtures ergänzen; DNS-Pinning in safeFetch;
    GLB-Upload für Herstellermodelle; Affiliate-Links (Awin/Partnerprogramme) für die Einkaufsliste
 1. Foto-Render: Albedo/Normal-Hilfsbilder für OIDN (bessere Texturdetails), Kamera-Presets pro Raum, Batch „alle Räume“

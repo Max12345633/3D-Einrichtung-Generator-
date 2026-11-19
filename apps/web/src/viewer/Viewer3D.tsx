@@ -22,9 +22,38 @@ export function Viewer3D() {
   const setWalkMode = usePlanStore((s) => s.setWalkMode);
   const [cutaway, setCutaway] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const placingHint = usePlanStore((s) => s.tool === "furniture" && !!s.placing);
+
+  // Katalog-Möbel in die 3D-Ansicht ziehen: Bodenpunkt per Strahl aus der Kamera bestimmen
+  const floorPointAt = (clientX: number, clientY: number): { x: number; y: number } | null => {
+    const cam = viewportScene.current?.camera;
+    const rect = wrapRef.current?.getBoundingClientRect();
+    if (!cam || !rect) return null;
+    const ndc = new THREE.Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(ndc, cam);
+    const hit = ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), new THREE.Vector3());
+    return hit ? { x: hit.x, y: hit.z } : null;
+  };
 
   return (
-    <div className="viewer3d">
+    <div
+      className="viewer3d"
+      ref={wrapRef}
+      onDragOver={(e) => { if (usePlanStore.getState().dragCatalogId) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; } }}
+      onDrop={(e) => {
+        const s = usePlanStore.getState();
+        const id = s.dragCatalogId;
+        const at = floorPointAt(e.clientX, e.clientY);
+        if (!id || !at) return;
+        e.preventDefault();
+        s.setDragCatalogId(null);
+        const item = s.snapping ? snapFurnitureToWall({ id: "drop", catalogId: id, position: at, rotation: 0 }, s.plan.walls) : { position: at, rotation: 0 };
+        s.setTool("select");
+        s.placeFurniture(id, item.position, item.rotation);
+      }}
+    >
       <Canvas
         shadows
         dpr={[1, 2]}
@@ -49,6 +78,7 @@ export function Viewer3D() {
         )}
       </div>
       {walkMode && <div className="viewer3d-hint">Klicke in die Ansicht · W A S D bzw. Pfeiltasten laufen · Maus umsehen · Esc beendet</div>}
+      {!walkMode && placingHint && <div className="viewer3d-hint">Auf den Boden klicken zum Platzieren · R dreht 90°, Q/E 15° · Shift+Klick setzt mehrere</div>}
     </div>
   );
 }
@@ -187,7 +217,11 @@ function Scene({ plan, cutaway, ceiling, onDragChange }: { plan: Plan; cutaway: 
   const selection = usePlanStore((s) => s.selection);
   const snapping = usePlanStore((s) => s.snapping);
   const tool = usePlanStore((s) => s.tool);
+  const placing = usePlanStore((s) => s.placing);
+  const placingRotation = usePlanStore((s) => s.placingRotation);
   const { select, beginGesture, live } = usePlanStore.getState();
+  const [ghost, setGhost] = useState<{ x: number; y: number; rotation: number } | null>(null);
+  useEffect(() => { if (!placing) setGhost(null); }, [placing]);
   const rooms = useMemo(() => detectRooms(plan.walls), [plan.walls]);
   const roomKinds = useMemo(() => new Map(rooms.map((r) => [r.id, classifyRoom(r, plan)])), [rooms, plan.furniture]); // eslint-disable-line react-hooks/exhaustive-deps
   const collisions = useMemo(() => findCollisions(plan.furniture), [plan.furniture]);
@@ -202,7 +236,25 @@ function Scene({ plan, cutaway, ceiling, onDragChange }: { plan: Plan; cutaway: 
     return () => window.removeEventListener("pointerup", up);
   }, [onDragChange]);
 
+  /** Platzieren-Vorschau: Möbel folgt dem Zeiger, dockt an Wände an */
+  const ghostAt = (point: THREE.Vector3, alt: boolean) => {
+    if (!placing) return null;
+    const item = { id: "ghost", catalogId: placing, position: { x: point.x, y: point.z }, rotation: placingRotation };
+    const snapped = snapping && !alt ? snapFurnitureToWall(item, plan.walls) : item;
+    return { x: snapped.position.x, y: snapped.position.y, rotation: snapped.rotation };
+  };
+  const onFloorClick = (e: ThreeEvent<MouseEvent>) => {
+    if (!placing || tool !== "furniture") return;
+    e.stopPropagation();
+    const g = ghostAt(e.point, e.altKey);
+    if (g) usePlanStore.getState().placeFurniture(placing, { x: g.x, y: g.y }, g.rotation, e.shiftKey);
+  };
+
   const onFloorMove = (e: ThreeEvent<PointerEvent>) => {
+    if (placing && tool === "furniture" && !dragId.current) {
+      setGhost(ghostAt(e.point, e.nativeEvent.altKey));
+      return;
+    }
     const id = dragId.current;
     if (!id) return;
     e.stopPropagation();
@@ -236,13 +288,29 @@ function Scene({ plan, cutaway, ceiling, onDragChange }: { plan: Plan; cutaway: 
       </directionalLight>
 
       {/* Boden: Räume als eigene Flächen, darunter eine neutrale Grundplatte */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[center.cx, -0.01, center.cz]} receiveShadow onPointerMove={onFloorMove} onPointerDown={(e) => { if (tool === "select" && !dragId.current && e.button === 0) select(null); }}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[center.cx, -0.01, center.cz]} receiveShadow onPointerMove={onFloorMove} onClick={onFloorClick} onPointerDown={(e) => { if (tool === "select" && !dragId.current && e.button === 0) select(null); }}>
         <planeGeometry args={[center.span * 4, center.span * 4]} />
         <meshStandardMaterial color="#dcdcd6" roughness={1} />
       </mesh>
       {rooms.map((r) => (
-        <RoomFloor key={r.id} polygon={r.polygon} material={floorMaterial(roomKinds.get(r.id) === "bath" ? bathFloor(plan.floorMaterial) : plan.floorMaterial)} onPointerMove={onFloorMove} />
+        <RoomFloor key={r.id} polygon={r.polygon} material={floorMaterial(roomKinds.get(r.id) === "bath" ? bathFloor(plan.floorMaterial) : plan.floorMaterial)} onPointerMove={onFloorMove} onClick={onFloorClick} />
       ))}
+      {ghost && placing && CATALOG_BY_ID[placing] && (() => {
+        const e = CATALOG_BY_ID[placing]!;
+        return (
+          <group position={[ghost.x, 0, ghost.y]} rotation={[0, -ghost.rotation, 0]} userData={{ noPhoto: true }} raycast={() => null}>
+            <mesh position={[0, e.height / 2, 0]} raycast={() => null}>
+              <boxGeometry args={[e.width, e.height, e.depth]} />
+              <meshStandardMaterial color="#2f7d6d" transparent opacity={0.35} depthWrite={false} />
+            </mesh>
+            {/* Pfeil zur Vorderseite, damit die Ausrichtung klar ist */}
+            <mesh position={[0, 0.02, e.depth / 2 + 0.12]} rotation={[-Math.PI / 2, 0, -Math.PI / 2]} raycast={() => null}>
+              <circleGeometry args={[0.09, 3]} />
+              <meshBasicMaterial color="#2f7d6d" />
+            </mesh>
+          </group>
+        );
+      })()}
       {ceiling && rooms.map((r) => <Ceiling key={`c${r.id}`} polygon={r.polygon} height={Math.min(...plan.walls.map((w) => w.height))} />)}
       <group userData={{ noPhoto: true }}>
         <ContactShadows position={[center.cx, 0.002, center.cz]} scale={center.span * 1.6} opacity={0.3} blur={2.5} far={3} />
@@ -305,12 +373,12 @@ function Ceiling({ polygon, height }: { polygon: { x: number; y: number }[]; hei
   );
 }
 
-function RoomFloor({ polygon, material: mat, onPointerMove }: { polygon: { x: number; y: number }[]; material: THREE.Material; onPointerMove: (e: ThreeEvent<PointerEvent>) => void }) {
+function RoomFloor({ polygon, material: mat, onPointerMove, onClick }: { polygon: { x: number; y: number }[]; material: THREE.Material; onPointerMove: (e: ThreeEvent<PointerEvent>) => void; onClick: (e: ThreeEvent<MouseEvent>) => void }) {
   const geometry = useMemo(() => polygonGeometry(polygon, 0.001), [polygon]);
   useEffect(() => () => geometry.dispose(), [geometry]);
   // Normale zeigt nach dem Drehen nach unten → Material beidseitig; im Path-Tracer ebenso
   useEffect(() => { mat.side = THREE.DoubleSide; }, [mat]);
-  return <mesh geometry={geometry} material={mat} receiveShadow onPointerMove={onPointerMove} />;
+  return <mesh geometry={geometry} material={mat} receiveShadow onPointerMove={onPointerMove} onClick={onClick} />;
 }
 
 function WallMesh({ wall, openings, color, selected, onSelect }: { wall: Wall; openings: Opening[]; color: string; selected: boolean; onSelect: () => void }) {

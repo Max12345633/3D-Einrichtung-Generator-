@@ -344,6 +344,39 @@ export function parseProductHtml(html: string, url: string): ProductInfo {
   };
 }
 
+/**
+ * Kopierter Text einer Produktseite (Strg+A, Strg+C) → Produktdaten.
+ * Für Shops, die weder Link-Abruf noch Lesezeichen zulassen, und für die Online-Testversion ohne Server.
+ */
+export function parseProductText(text: string, url?: string): ProductInfo {
+  const clean = text.replace(/\r/g, "").replace(/\u00a0/g, " ").slice(0, 200_000);
+  const lines = clean.split("\n").map((l) => l.trim()).filter(Boolean);
+  // Name: erste aussagekräftige Zeile, die nach Möbel klingt – sonst erste „normale“ Zeile
+  const candidates = lines.slice(0, 80).filter((l) => l.length >= 4 && l.length <= 140 && !/€|eur\b|\d+[.,]\d{2}|warenkorb|anmelden|cookie|menü|menu|suche|versand|lieferung|bewertung|startseite|home\b/i.test(l));
+  const furnitureLike = candidates.find((l) => guessKind(l).shape !== "sideboard" || /sideboard|kommode|schrank|anrichte/i.test(l));
+  const name = (furnitureLike ?? candidates[0] ?? "Importiertes Möbel").slice(0, 160);
+
+  // Preise: „599,– €“, „€ 1.299,00“, „149,99 EUR“
+  const priceMatch = /(?:€\s*(\d{1,3}(?:[.\s]\d{3})*(?:,\d{2}|,[–-])?|\d+(?:,\d{2})?))|(?:(\d{1,3}(?:[.\s]\d{3})*(?:,\d{2}|,[–-])?)\s*(?:€|eur\b))/i.exec(clean);
+  const rawPrice = priceMatch?.[1] ?? priceMatch?.[2];
+  const price = rawPrice ? Number(rawPrice.replace(/,[–-]$/, "").replace(/[.\s]/g, "").replace(",", ".")) : undefined;
+
+  const colorName = /(?:^|\n)\s*(?:farbe|colou?r|bezug(?:sfarbe)?|stoff)\s*[:\-]?\s*([^\n]{2,40})/i.exec(clean)?.[1]?.trim();
+  const pageUrl = url && /^https?:\/\//.test(url) ? url : "https://manuell.invalid/";
+  const kind = guessKind(name);
+  return {
+    url: pageUrl,
+    shop: url ? shopName(pageUrl) : "eingefügter Text",
+    name,
+    price: price !== undefined && Number.isFinite(price) && price > 0 ? price : undefined,
+    currency: price !== undefined ? "EUR" : undefined,
+    colorName,
+    color: colorFromName(colorName) ?? colorFromName(name),
+    dimensions: extractDimensions(clean),
+    ...kind,
+  };
+}
+
 export interface ImportOverrides {
   name?: string;
   shape?: FurnitureShape;

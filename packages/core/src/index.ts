@@ -12,3 +12,5 @@ export * from "./ops";
 export * from "./styles";
 export * from "./analysis";
 export * from "./productImport";
+export * from "./floorplanDetect";
+export * from "./floorplanImport";

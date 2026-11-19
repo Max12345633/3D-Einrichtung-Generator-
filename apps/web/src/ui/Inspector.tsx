@@ -5,6 +5,7 @@ import {
 } from "@raumwerk/core";
 import { normalizeAngle, usePlanStore } from "../store/planStore";
 import { formatArea, formatCm, formatPrice } from "../lib/format";
+import { entryImage, isShopUrl } from "../lib/importApi";
 
 const WALLS = [
   { label: "Weiß", value: "#f3f1ec" }, { label: "Greige", value: "#ddd5c8" }, { label: "Salbei", value: "#c9d3c0" },
@@ -27,9 +28,11 @@ export function Inspector() {
           <h3 className="inspector-name">{entry.name}</h3>
           {entry.source ? (
             <div className="shop-card">
-              {entry.source.imageUrl && <img src={entry.source.imageUrl} alt="" referrerPolicy="no-referrer" />}
+              {entryImage(entry) && <img src={entryImage(entry)} alt="" referrerPolicy="no-referrer" />}
               <div>
-                <a href={entry.source.url} target="_blank" rel="noopener noreferrer nofollow">{entry.source.shop} <ExternalLink size={12} /></a>
+                {isShopUrl(entry.source.url)
+                  ? <a href={entry.source.url} target="_blank" rel="noopener noreferrer nofollow">{entry.source.shop} <ExternalLink size={12} /></a>
+                  : <span className="muted small">Eigenes Möbel</span>}
                 {entry.source.price !== undefined && <strong>{formatPrice(entry.source.price, entry.source.currency)}</strong>}
               </div>
             </div>
@@ -216,7 +219,9 @@ function ShoppingList() {
           <ul>
             {list.items.map(({ entry, qty }) => (
               <li key={entry.id}>
-                <a href={entry.source!.url} target="_blank" rel="noopener noreferrer nofollow">{qty > 1 ? `${qty}× ` : ""}{entry.name}</a>
+                {isShopUrl(entry.source!.url)
+                  ? <a href={entry.source!.url} target="_blank" rel="noopener noreferrer nofollow">{qty > 1 ? `${qty}× ` : ""}{entry.name}</a>
+                  : <span>{qty > 1 ? `${qty}× ` : ""}{entry.name}</span>}
                 <span>{entry.source!.price !== undefined ? formatPrice(entry.source!.price * qty, entry.source!.currency) : "–"}</span>
               </li>
             ))}

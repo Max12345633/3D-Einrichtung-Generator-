@@ -18,7 +18,13 @@ export function useShortcuts() {
       if (mod) return;
       if (k === "delete" || k === "backspace") { e.preventDefault(); return s.deleteSelection(); }
       if (k === "escape") return s.selection ? s.select(null) : s.setTool("select");
+      // Beim Platzieren dreht R/Q/E das Möbel, das gleich abgesetzt wird
+      if (s.placing && (k === "r" || k === "q" || k === "e")) {
+        return s.rotatePlacing(k === "r" ? Math.PI / 2 : k === "e" ? Math.PI / 12 : -Math.PI / 12);
+      }
       if (k === "r") return s.rotateSelection(e.shiftKey ? Math.PI / 12 : Math.PI / 2);
+      if (k === "e") return s.rotateSelection(Math.PI / 12);
+      if (k === "q") return s.rotateSelection(-Math.PI / 12);
       if (k === "v") return s.setTool("select");
       if (k === "w") return s.setTool("wall");
       if (k === "t") return s.setTool("door");

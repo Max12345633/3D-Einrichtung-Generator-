@@ -31,8 +31,22 @@ export function addWall(plan: Plan, a: Vec2, b: Vec2, thickness: number, height:
   if (distance(a, b) < 0.05) return { plan, wall: null };
   let next = splitAt(plan, a, tolerance);
   next = splitAt(next, b, tolerance);
-  const wall: Wall = { id: createId("wall"), a: { ...a }, b: { ...b }, thickness, height };
-  return { plan: touch({ ...next, walls: [...next.walls, wall] }), wall };
+  // Bestehende Wandenden, die auf der neuen Wand liegen (T-Stöße), teilen die neue Wand –
+  // sonst fehlen der Raumerkennung die Knoten
+  const len = distance(a, b);
+  const cuts = next.walls
+    .flatMap((w) => [w.a, w.b])
+    .map((p) => ({ p, pr: projectOnSegment(p, a, b) }))
+    .filter(({ pr }) => pr.dist <= tolerance && pr.t * len > 0.05 && (1 - pr.t) * len > 0.05)
+    .map(({ pr }) => ({ t: pr.t, point: pr.point }))
+    .sort((x, y) => x.t - y.t)
+    .filter((c, i, arr) => i === 0 || c.t * len - arr[i - 1]!.t * len > 0.01);
+  const points = [a, ...cuts.map((c) => c.point), b];
+  const pieces: Wall[] = [];
+  for (let i = 0; i < points.length - 1; i++) {
+    pieces.push({ id: createId("wall"), a: { ...points[i]! }, b: { ...points[i + 1]! }, thickness, height });
+  }
+  return { plan: touch({ ...next, walls: [...next.walls, ...pieces] }), wall: pieces[0] ?? null };
 }
 
 /** Verschiebt einen Wandknoten inkl. aller dort anschließenden Wände. */

@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CATALOG_BY_ID, OPENING_DEFAULTS, boundsOf, detectRooms, distance, findCollisions, moveJunction, nearestWall,
-  pointOnWall, projectOnSegment, snapFurnitureToWall, snapPoint, updateFurniture, updateOpening, wallAngle,
+  pointOnWall, projectOnSegment, scalePlanGeometry, snapFurnitureToWall, snapPoint, updateFurniture, updateOpening, wallAngle,
   wallLength, type FurnitureItem, type Opening, type SnapKind, type Vec2, type Wall,
 } from "@raumwerk/core";
 import { usePlanStore } from "../store/planStore";
 import { formatArea, formatLength } from "../lib/format";
 import { CalibrationDialog } from "../ui/CalibrationDialog";
+import { FloorplanAssistant } from "../ui/FloorplanAssistant";
 
 interface Camera {
   cx: number;
@@ -19,7 +20,8 @@ type Drag =
   | { kind: "pan"; startX: number; startY: number; cam: Camera }
   | { kind: "furniture"; id: string; offset: Vec2 }
   | { kind: "junction"; from: Vec2 }
-  | { kind: "opening"; id: string };
+  | { kind: "opening"; id: string }
+  | { kind: "rotate"; id: string };
 
 const RAD2DEG = 180 / Math.PI;
 
@@ -28,6 +30,8 @@ export function Editor2D() {
   const tool = usePlanStore((s) => s.tool);
   const selection = usePlanStore((s) => s.selection);
   const placing = usePlanStore((s) => s.placing);
+  const placingRotation = usePlanStore((s) => s.placingRotation);
+  const dragCatalogId = usePlanStore((s) => s.dragCatalogId);
   const snapping = usePlanStore((s) => s.snapping);
   const { select, drawWall, placeOpening, placeFurniture, beginGesture, live, commit, setTool } = usePlanStore.getState();
 
@@ -153,8 +157,9 @@ export function Editor2D() {
       return;
     }
     if (tool === "furniture" && placing) {
-      const ghost = placeItem({ id: "ghost", catalogId: placing, position: snap(world).point, rotation: 0 });
-      placeFurniture(placing, ghost.position, ghost.rotation);
+      const ghost = placeItem({ id: "ghost", catalogId: placing, position: snap(world).point, rotation: placingRotation });
+      // Shift: mehrere Exemplare hintereinander platzieren
+      placeFurniture(placing, ghost.position, ghost.rotation, e.shiftKey);
       return;
     }
     if (tool === "calibrate") {
@@ -186,6 +191,17 @@ export function Editor2D() {
       live((p) => moveJunction(p, d.from, s.point));
       d.from = s.point;
       setCursor(s);
+      return;
+    }
+    if (d?.kind === "rotate") {
+      live((p) => {
+        const f = p.furniture.find((x) => x.id === d.id);
+        if (!f) return p;
+        // Griff zeigt in lokale −y-Richtung (hinter dem Möbel) → Winkel so, dass er zum Zeiger zeigt
+        let angle = Math.atan2(world.x - f.position.x, -(world.y - f.position.y));
+        if (!modifiers.shift) angle = Math.round(angle / (Math.PI / 12)) * (Math.PI / 12);
+        return updateFurniture(p, f.id, { rotation: ((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) });
+      });
       return;
     }
     if (d?.kind === "opening") {
@@ -228,6 +244,13 @@ export function Editor2D() {
     beginGesture();
     drag.current = { kind: "junction", from: { ...p } };
   };
+  const startRotateDrag = (e: React.PointerEvent, f: FurnitureItem) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    svgRef.current?.setPointerCapture(e.pointerId);
+    beginGesture();
+    drag.current = { kind: "rotate", id: f.id };
+  };
   const startOpeningDrag = (e: React.PointerEvent, o: Opening) => {
     if (tool !== "select" || e.button !== 0) return;
     e.stopPropagation();
@@ -250,9 +273,28 @@ export function Editor2D() {
         return { wall: hit.wall, center: pointOnWall(hit.wall, offset), width };
       })()
     : null;
-  const ghost = tool === "furniture" && placing && cursor
-    ? placeItem({ id: "ghost", catalogId: placing, position: cursor.point, rotation: 0 })
+  const ghostId = dragCatalogId ?? (tool === "furniture" ? placing : null);
+  const ghost = ghostId && cursor
+    ? placeItem({ id: "ghost", catalogId: ghostId, position: cursor.point, rotation: dragCatalogId ? 0 : placingRotation })
     : null;
+  const selectedFurniture = selection?.kind === "furniture" ? plan.furniture.find((f) => f.id === selection.id) : undefined;
+
+  // Drag & Drop aus dem Katalog
+  const onDragOver = (e: React.DragEvent) => {
+    if (!usePlanStore.getState().dragCatalogId) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    setCursor(snap(toWorld(e.clientX, e.clientY)));
+  };
+  const onDrop = (e: React.DragEvent) => {
+    const id = usePlanStore.getState().dragCatalogId;
+    if (!id) return;
+    e.preventDefault();
+    const item = placeItem({ id: "ghost", catalogId: id, position: snap(toWorld(e.clientX, e.clientY)).point, rotation: 0 });
+    usePlanStore.getState().setDragCatalogId(null);
+    setTool("select");
+    placeFurniture(id, item.position, item.rotation);
+  };
 
   const cursorStyle = tool === "select" ? (drag.current?.kind === "pan" ? "grabbing" : "default") : "crosshair";
 
@@ -269,6 +311,9 @@ export function Editor2D() {
         onPointerLeave={() => !drag.current && setCursor(null)}
         onDoubleClick={() => setChain(null)}
         onContextMenu={(e) => e.preventDefault()}
+        onDragOver={onDragOver}
+        onDragLeave={() => setCursor(null)}
+        onDrop={onDrop}
       >
         <defs>
           <pattern id="grid-minor" width={0.5} height={0.5} patternUnits="userSpaceOnUse">
@@ -371,6 +416,23 @@ export function Editor2D() {
           </g>
         ))}
 
+        {/* Auswahl: Drehgriff am Möbel */}
+        {selectedFurniture && tool === "select" && (() => {
+          const entry = CATALOG_BY_ID[selectedFurniture.catalogId];
+          if (!entry) return null;
+          const reach = entry.depth / 2 + px(30);
+          return (
+            <g transform={`translate(${selectedFurniture.position.x} ${selectedFurniture.position.y}) rotate(${selectedFurniture.rotation * RAD2DEG})`}>
+              <line x1={0} y1={-entry.depth / 2} x2={0} y2={-reach} className="rotate-stem" strokeWidth={px(1.5)} />
+              <g transform={`translate(0 ${-reach})`} className="rotate-handle" onPointerDown={(e) => startRotateDrag(e, selectedFurniture)}>
+                <circle r={px(11)} strokeWidth={px(1.5)} />
+                <path d={`M ${px(-5)} ${px(-2)} A ${px(5)} ${px(5)} 0 1 1 ${px(-2)} ${px(4.5)}`} strokeWidth={px(1.6)} fill="none" />
+                <path d={`M ${px(-5)} ${px(-5.5)} L ${px(-5)} ${px(-1.5)} L ${px(-1)} ${px(-1.5)}`} strokeWidth={px(1.6)} fill="none" />
+              </g>
+            </g>
+          );
+        })()}
+
         {/* Auswahl: Wandmaß + Knoten-Griffe */}
         {selectedWall && (
           <g>
@@ -424,15 +486,22 @@ export function Editor2D() {
         <button className="icon-btn" onClick={fit} aria-label="Einpassen" title="Einpassen">⤢</button>
       </div>
 
+      {plan.background && <FloorplanAssistant onDetected={() => { fitted.current = false; setTimeout(fit, 0); }} />}
+
       {tool === "calibrate" && calib.length === 2 && plan.background && (
         <CalibrationDialog
           measured={distance(calib[0]!, calib[1]!)}
           onCancel={() => setCalib([])}
           onConfirm={(real) => {
             const factor = real / distance(calib[0]!, calib[1]!);
-            commit((p) => p.background ? { ...p, background: { ...p.background, metersPerPixel: p.background.metersPerPixel * factor, origin: { x: p.background.origin.x * factor, y: p.background.origin.y * factor } } } : p);
+            // Bild und bereits erkannte/gezeichnete Wände gemeinsam skalieren (um den Bildursprung)
+            commit((p) => {
+              if (!p.background) return p;
+              const scaled = scalePlanGeometry(p, factor, p.background.origin);
+              return { ...scaled, background: { ...scaled.background!, calibrated: true } };
+            });
             setCalib([]);
-            setTool("wall");
+            setTool(usePlanStore.getState().plan.walls.length ? "select" : "wall");
             fitted.current = false;
             setTimeout(fit, 0);
           }}
@@ -455,11 +524,11 @@ function hintFor(tool: string, drawing: boolean, placing: boolean, calibPoints: 
       : "Klicke, um eine Wand zu beginnen. Wände rasten an Knoten, Wänden und 15°-Winkeln ein.";
     case "door": return "Klicke auf eine Wand, um eine Tür einzusetzen.";
     case "window": return "Klicke auf eine Wand, um ein Fenster einzusetzen.";
-    case "furniture": return placing ? "Klicke zum Platzieren. In Wandnähe dockt das Möbel automatisch an (Alt = frei)." : "Wähle links ein Möbel aus dem Katalog.";
+    case "furniture": return placing ? "Klicke zum Platzieren · R dreht 90°, Q/E 15° · Shift+Klick setzt mehrere · an Wänden dockt es an (Alt = frei)" : "Wähle links ein Möbel aus dem Katalog oder zieh es auf den Plan.";
     case "calibrate": return calibPoints < 2
       ? `Maßstab festlegen: Klicke Anfang und Ende einer bekannten Strecke im Grundriss (${calibPoints}/2).`
       : "Gib die echte Länge ein.";
-    default: return "Ziehen = verschieben · Mausrad = zoomen · R = drehen · Entf = löschen · Strg+Z = rückgängig";
+    default: return "Möbel ziehen = verschieben · runder Griff = drehen · R/Q/E = drehen · Entf = löschen · Mausrad = zoomen";
   }
 }
 

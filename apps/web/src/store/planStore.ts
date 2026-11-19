@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
 import {
   DEFAULT_WALL_HEIGHT, DEFAULT_WALL_THICKNESS, addCustomEntry, addFurniture, addOpening, addWall, emptyPlan, parsePlan,
-  registerCatalogEntries, removeById, samplePlan, updateFurniture, type CatalogEntry, type Opening, type Plan, type ProductInfo, type Vec2,
+  registerCatalogEntries, removeById, samplePlan, snapFurnitureToWall, updateFurniture, type CatalogEntry, type Opening, type Plan, type ProductInfo, type Vec2,
 } from "@raumwerk/core";
 
 export type Tool = "select" | "wall" | "door" | "window" | "furniture" | "calibrate";
@@ -24,6 +24,14 @@ interface PlanState {
   selection: Selection | null;
   /** Katalog-ID, die beim nächsten Klick platziert wird */
   placing: string | null;
+  /** Drehung des Möbels vor dem Absetzen (R / Q / E) */
+  placingRotation: number;
+  /** Katalog-ID, die gerade per Drag & Drop aus der Liste gezogen wird */
+  dragCatalogId: string | null;
+  setDragCatalogId: (id: string | null) => void;
+  rotatePlacing: (delta: number) => void;
+  /** Ausgewähltes Möbel an die nächste Wand stellen */
+  alignSelectionToWall: () => boolean;
   wallThickness: number;
   snapping: boolean;
   onboarded: boolean;
@@ -33,6 +41,9 @@ interface PlanState {
   openImport: (initial?: ProductInfo | null) => void;
   /** Kurze Hinweismeldung unten im Bild (statt alert, das in Sandboxes nicht angezeigt wird) */
   notice: { id: number; text: string } | null;
+  /** Grundriss-Assistent (Wanderkennung, Maßstab) sichtbar */
+  assistantOpen: boolean;
+  setAssistantOpen: (v: boolean) => void;
   notify: (text: string) => void;
   closeImport: () => void;
 
@@ -59,7 +70,7 @@ interface PlanState {
 
   drawWall: (a: Vec2, b: Vec2) => void;
   placeOpening: (kind: Opening["kind"], at: Vec2) => boolean;
-  placeFurniture: (catalogId: string, at: Vec2, rotation?: number) => void;
+  placeFurniture: (catalogId: string, at: Vec2, rotation?: number, keepPlacing?: boolean) => void;
   /** Importiertes Shop-Möbel ins Projekt übernehmen und direkt zum Platzieren bereitstellen */
   importEntry: (entry: CatalogEntry) => void;
   deleteSelection: () => void;
@@ -87,12 +98,28 @@ export const usePlanStore = create<PlanState>()(
       view: "split",
       selection: null,
       placing: null,
+      placingRotation: 0,
+      dragCatalogId: null,
+      setDragCatalogId: (dragCatalogId) => set({ dragCatalogId }),
+      rotatePlacing: (delta) => set(({ placingRotation }) => ({ placingRotation: normalizeAngle(placingRotation + delta) })),
+      alignSelectionToWall: () => {
+        const sel = get().selection;
+        if (sel?.kind !== "furniture") return false;
+        const f = get().plan.furniture.find((x) => x.id === sel.id);
+        if (!f) return false;
+        const snapped = snapFurnitureToWall(f, get().plan.walls, 1.5);
+        if (snapped === f) return false;
+        get().commit((p) => updateFurniture(p, f.id, { position: snapped.position, rotation: snapped.rotation }));
+        return true;
+      },
       wallThickness: DEFAULT_WALL_THICKNESS,
       snapping: true,
       onboarded: false,
       walkMode: false,
       importDialog: { open: false, initial: null },
       notice: null,
+      assistantOpen: false,
+      setAssistantOpen: (assistantOpen) => set({ assistantOpen }),
       notify: (text) => set({ notice: { id: Date.now(), text } }),
       openImport: (initial = null) => set({ importDialog: { open: true, initial } }),
       closeImport: () => set({ importDialog: { open: false, initial: null } }),
@@ -125,7 +152,7 @@ export const usePlanStore = create<PlanState>()(
       setTool: (tool) => set({ tool, placing: tool === "furniture" ? get().placing : null, selection: tool === "select" ? get().selection : null }),
       setView: (view) => set({ view }),
       select: (selection) => set({ selection }),
-      startPlacing: (catalogId) => set({ placing: catalogId, tool: "furniture", selection: null }),
+      startPlacing: (catalogId) => set({ placing: catalogId, tool: "furniture", selection: null, placingRotation: 0 }),
       setWallThickness: (wallThickness) => set({ wallThickness }),
       toggleSnapping: () => set(({ snapping }) => ({ snapping: !snapping })),
       setOnboarded: (onboarded) => set({ onboarded }),
@@ -139,11 +166,12 @@ export const usePlanStore = create<PlanState>()(
         set({ selection: { kind: "opening", id: res.opening.id } });
         return true;
       },
-      placeFurniture: (catalogId, at, rotation = 0) => {
+      placeFurniture: (catalogId, at, rotation = 0, keepPlacing = false) => {
         const res = addFurniture(get().plan, catalogId, at, rotation);
         if (!res.item) return;
         get().commit(() => res.plan);
-        set({ selection: { kind: "furniture", id: res.item.id }, placing: null, tool: "select" });
+        if (keepPlacing) set({ selection: null });
+        else set({ selection: { kind: "furniture", id: res.item.id }, placing: null, tool: "select" });
       },
       importEntry: (entry) => {
         get().commit((p) => addCustomEntry(p, entry));

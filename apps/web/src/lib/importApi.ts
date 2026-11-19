@@ -1,4 +1,4 @@
-import { parseProductHtml, type ProductInfo } from "@raumwerk/core";
+import { parseProductHtml, type CatalogEntry, type ProductInfo } from "@raumwerk/core";
 
 export interface ImportResult {
   product: ProductInfo;
@@ -36,10 +36,10 @@ export const imageProxyUrl = (url: string) => `api/import/image?url=${encodeURIC
  * Hauptfarbe eines Produktfotos: weißer/grauer Studiohintergrund und Transparenz werden ignoriert,
  * vom Rest wird der Median genommen (robust gegen Schatten und Glanzlichter).
  */
-export async function dominantColor(imageUrl: string): Promise<string | undefined> {
+export async function dominantColor(src: string): Promise<string | undefined> {
   const img = new Image();
   img.decoding = "async";
-  img.src = imageProxyUrl(imageUrl);
+  img.src = src.startsWith("data:") ? src : imageProxyUrl(src);
   try {
     await img.decode();
   } catch {
@@ -108,5 +108,77 @@ export function parseClipboardImport(text: string): ProductInfo | null {
     return parseProductHtml(h, u);
   } catch {
     return null;
+  }
+}
+
+// ---------- Produktbilder ----------
+
+const THUMB = 360;
+
+function decodeTo(img: HTMLImageElement): string | undefined {
+  const s = Math.min(1, THUMB / Math.max(img.naturalWidth, img.naturalHeight));
+  const c = document.createElement("canvas");
+  c.width = Math.max(1, Math.round(img.naturalWidth * s));
+  c.height = Math.max(1, Math.round(img.naturalHeight * s));
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = "#fff"; // transparente PNGs auf Weiß
+  ctx.fillRect(0, 0, c.width, c.height);
+  ctx.drawImage(img, 0, 0, c.width, c.height);
+  try {
+    return c.toDataURL("image/jpeg", 0.85);
+  } catch {
+    return undefined; // „tainted canvas“ (fremdes Bild ohne CORS)
+  }
+}
+
+async function tryLoad(src: string, cors: boolean): Promise<HTMLImageElement | null> {
+  const img = new Image();
+  if (cors) img.crossOrigin = "anonymous";
+  img.referrerPolicy = "no-referrer";
+  img.src = src;
+  try {
+    await img.decode();
+    return img;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Kleines Vorschaubild (Data-URL) aus Datei, eingefügtem Bild oder Bild-URL.
+ * URL: zuerst über den eigenen Server, sonst direkt (klappt, wenn der Shop CORS erlaubt).
+ */
+export async function toThumbnail(src: Blob | string): Promise<string | undefined> {
+  if (typeof src !== "string") {
+    const url = URL.createObjectURL(src);
+    try {
+      const img = await tryLoad(url, false);
+      return img ? decodeTo(img) : undefined;
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+  if (src.startsWith("data:")) {
+    const img = await tryLoad(src, false);
+    return img ? decodeTo(img) : undefined;
+  }
+  for (const [candidate, cors] of [[imageProxyUrl(src), false], [src, true]] as const) {
+    const img = await tryLoad(candidate, cors);
+    const data = img && decodeTo(img);
+    if (data) return data;
+  }
+  return undefined;
+}
+
+/** Bestes verfügbares Bild eines Katalogeintrags (gespeichertes Vorschaubild vor externer URL). */
+export const entryImage = (e: CatalogEntry | undefined): string | undefined => e?.source?.imageData ?? e?.source?.imageUrl;
+
+/** Echte Shop-Adresse? (Manuell angelegte/eingefügte Möbel haben eine Platzhalter-URL *.invalid) */
+export function isShopUrl(url: string | undefined): url is string {
+  if (!url) return false;
+  try {
+    return !new URL(url).hostname.endsWith(".invalid");
+  } catch {
+    return false;
   }
 }

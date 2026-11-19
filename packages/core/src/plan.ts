@@ -22,6 +22,7 @@ export const catalogEntrySchema = z.object({
     url: z.string().url().max(2000),
     shop: z.string().max(120),
     imageUrl: z.string().url().max(2000).optional(),
+    imageData: z.string().regex(/^data:image\/(jpeg|png|webp);base64,/).max(300_000).optional(),
     price: z.number().nonnegative().max(1_000_000).optional(),
     currency: z.string().max(8).optional(),
     measured: z.object({ width: z.boolean(), depth: z.boolean(), height: z.boolean() }).optional(),
@@ -49,7 +50,7 @@ export const planSchema = z.object({
   wallColor: z.string(),
   customCatalog: z.array(catalogEntrySchema).max(500).optional(),
   background: z.object({
-    dataUrl: z.string(), widthPx: z.number().positive(), heightPx: z.number().positive(), metersPerPixel: z.number().positive(), origin: vec2, opacity: z.number().min(0).max(1),
+    dataUrl: z.string(), widthPx: z.number().positive(), heightPx: z.number().positive(), metersPerPixel: z.number().positive(), origin: vec2, opacity: z.number().min(0).max(1), calibrated: z.boolean().optional(),
   }).optional(),
   updatedAt: z.string(),
 });

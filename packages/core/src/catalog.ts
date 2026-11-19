@@ -16,6 +16,8 @@ export interface ProductSource {
   url: string;
   shop: string;
   imageUrl?: string;
+  /** Kleines Vorschaubild als Data-URL (wird mit dem Projekt gespeichert, funktioniert offline) */
+  imageData?: string;
   price?: number;
   currency?: string;
   /** Welche Maße aus der Shopseite stammen (Rest: Schätzung/Nutzereingabe) */

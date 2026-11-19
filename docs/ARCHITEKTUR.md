@@ -13,6 +13,8 @@ packages/core/         Reine TypeScript-Logik (keine UI, keine DOM-Abhängigkeit
   src/furniture.ts     Grundflächen, Kollision (SAT), Wand-Überschneidung
   src/catalog.ts       Möbelkatalog
   src/prompt.ts        Prompt-Bau (optional, externe Bild-KI)
+  src/floorplanDetect.ts Wanderkennung aus Grundriss-Bildern (Schwellwert, Morphologie, Segmente, Öffnungen, Ecken)
+  src/floorplanImport.ts Erkannte Wände → Plan (Meter), scalePlanGeometry für nachträglichen Maßstab
   src/productImport.ts Shop-Import: Produktseite → Name/Maße/Preis/Farbe/Möbelart, Einkaufsliste
   src/styles.ts        Einrichtungsstile (Shop-Möbel behalten ihre echte Farbe)
   test/                vitest
@@ -86,3 +88,16 @@ ImportDialog: prüfen/ändern (+ Farbe aus Produktfoto via /api/import/image) �
 
 Offen für Produktion: DNS-Pinning gegen Rebinding (undici Agent mit geprüfter IP), Caching pro URL,
 Shop-spezifische Parser für Seiten ohne Strukturdaten, Partner-/Affiliate-APIs als offizielle Datenquelle.
+
+## Grundriss-Bild → Plan
+
+```
+Bild (max. 2000 px) ─► Graustufen ─► Schwellwert an der stärksten dunklen Farbspitze (= Wände)
+  ─► Closing (Schraffur/Doppellinien füllen) ─► Opening (Text, Maßlinien, Möbelumrisse, Türbögen weg)
+  ─► lange waagerechte/senkrechte Läufe ─► Flächen ─► Segmente (zu gedrungen = Möbel → verworfen)
+  ─► kollineare Stücke + Lücke ─► Tür (innen) / Fenster (Außenhülle)
+  ─► Enden an Mittellinien andocken (Ecken, T-Stöße); freistehende kurze Stücke verworfen
+  ─► applyDetectedWalls: Pixel → Meter, Knoten verschmelzen, addWall (teilt T-Stöße), Öffnungen
+Maßstab: geschätzt aus Innenwandstärke (≈ 12 cm), exakt per Kalibrierung → scalePlanGeometry
+```
+Grenzen: nur waagerecht/senkrecht, Wände müssen gefüllt/dunkel sein; danach im Editor nachbessern.

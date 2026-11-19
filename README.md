@@ -8,15 +8,16 @@ Web-App, mit der man aus einem Grundriss in Minuten eine begehbare 3D-Wohnung ma
 
 ## Funktionen (Stand MVP-Grundgerüst)
 
-- **Grundriss hochladen** (JPG/PNG) und **Maßstab kalibrieren** (zwei Punkte klicken, echte Länge eingeben)
+- **Grundriss hochladen und automatisch umwandeln:** Wände, Türen und Fenster werden aus dem Bild erkannt (Exposé, Scan, Screenshot; dunkel gefüllte, waagerecht/senkrechte Wände). Maßstab wird aus der Wandstärke geschätzt und lässt sich mit zwei Klicks exakt festlegen – alles skaliert mit
 - **Wände zeichnen** mit Einrasten an Knoten, Wänden, 15°-Winkeln und 5-cm-Raster; T-Stöße; Knoten ziehen; Längen bemaßt
 - **Türen und Fenster** per Klick auf die Wand, verschiebbar, Maße editierbar
 - **Automatische Raumerkennung** mit m²-Angabe
-- **Möbelkatalog** (24 Teile): magnetisches Andocken an Wände, Kollisionswarnung, Drehen, Duplizieren, Farben
+- **Möbelkatalog** (24 Teile): per Klick oder **Drag & Drop** (2D und 3D) platzieren, magnetisches Andocken an Wände, Kollisionswarnung
+- **Einfach drehen:** Drehgriff am Möbel, Schnellleiste (±90°, ±15°, an Wand stellen, duplizieren, löschen), R/Q/E drehen schon vor dem Absetzen, Shift+Klick setzt mehrere
 - **3D-Ansicht** mit echten Wandöffnungen und Schatten, Möbel auch in 3D verschiebbar, „Wände niedrig“
 - **Rundgang** in Augenhöhe (WASD + Maus)
 - **Fotorealistische Bilder, selbst gerendert:** GPU-Path-Tracing (indirektes Licht, weiche Schatten, Reflexionen), Portal-Lichter in Fenstern, Sonne aus Fensterrichtung, 3 Lichtstimmungen, bis 1920 × 1080, KI-Entrauschen (Open Image Denoise via WebGPU) mit Filter-Fallback
-- **Möbel aus Online-Shops einfügen:** Link zur Produktseite einfügen → Name, **Maße**, Farbe, Bild und Preis werden übernommen (schema.org-Daten und typische Shop-Formate wie „B/H/T: 220/85/95 cm“ oder „Liegefläche 180 × 200“). Für Shops, die automatische Abrufe blocken: **Lesezeichen-Knopf** direkt auf der Produktseite. Dazu eine **Einkaufsliste** mit Summe und Shop-Links
+- **Möbel aus Online-Shops einfügen:** Link zur Produktseite einfügen → Name, **Maße**, Farbe, Bild und Preis werden übernommen (schema.org-Daten und typische Shop-Formate wie „B/H/T: 220/85/95 cm“ oder „Liegefläche 180 × 200“). Für Shops, die automatische Abrufe blocken: **Seitentext kopieren & einfügen** (Strg+A, Strg+C, Strg+V) oder **Lesezeichen-Knopf**. Produktbilder werden als Vorschau im Projekt gespeichert; eigene Bilder per Strg+V, Datei oder Drag & Drop, Farbe wird automatisch erkannt. Dazu eine **Einkaufsliste** mit Summe und Shop-Links
 - **7 Einrichtungsstile** (Skandinavisch, Japandi, Industrial …) als ein Klick auf Boden, Wände und Möbelfarben
 - **Echte Materialien:** prozedurale Holzdielen, Fliesen (Bad automatisch), Beton, Stoff mit Glanz, Lack, Metall, Keramik; Sockelleisten
 - Undo/Redo, automatisches Speichern im Browser, Projekt-Export/-Import (JSON), Tastenkürzel

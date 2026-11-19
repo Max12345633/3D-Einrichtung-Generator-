@@ -48,3 +48,14 @@ describe("ops", () => {
     expect(snapFurnitureToWall(free, p.walls)).toEqual(free);
   });
 });
+
+describe("addWall T-Stöße in beide Richtungen", () => {
+  it("teilt eine neue lange Wand an bestehenden Wandenden", () => {
+    let p = box();
+    // zuerst die kurze Querwand, die bei x=2 auf der (noch fehlenden) Mittelwand endet …
+    p = addWall(p, { x: 2, y: 1.5 }, { x: 4, y: 1.5 }, 0.1, 2.5).plan;
+    // … dann die lange Mittelwand von oben nach unten
+    p = addWall(p, { x: 2, y: 0 }, { x: 2, y: 3 }, 0.1, 2.5).plan;
+    expect(detectRooms(p.walls).map((r) => Math.round(r.area * 10) / 10).sort()).toEqual([3, 3, 6]);
+  });
+});

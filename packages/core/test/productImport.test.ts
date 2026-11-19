@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   CATALOG_BY_ID, addCustomEntry, addFurniture, applyStyle, colorFromName, emptyPlan, extractDimensions, findCollisions, footprint,
-  guessKind, parsePlan, parseProductHtml, polygonArea, productToCatalogEntry, removeCustomEntry, shoppingList, updateCustomEntry,
+  guessKind, parsePlan, parseProductHtml, parseProductText, polygonArea, productToCatalogEntry, removeCustomEntry, shoppingList, updateCustomEntry,
 } from "../src";
 
 const fixture = (name: string) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8");
@@ -130,5 +130,37 @@ describe("Import in den Plan", () => {
     const removed = removeCustomEntry(resized, entry.id);
     expect(removed.furniture).toHaveLength(1);
     expect(removed.customCatalog).toHaveLength(0);
+  });
+});
+
+describe("parseProductText (kopierter Seitentext)", () => {
+  const ikeaLike = `IKEA
+Produkte
+Warenkorb
+KIVIK
+3er-Sofa, Tresund anthrazit
+599,– €
+Bewertung 4,6 von 5
+Farbe: Tresund anthrazit
+Produktmaße
+Breite: 228 cm
+Tiefe: 95 cm
+Höhe: 83 cm
+Sitzhöhe: 45 cm`;
+
+  it("liest Name, Preis, Farbe und Maße", () => {
+    const p = parseProductText(ikeaLike);
+    expect(p.name).toBe("3er-Sofa, Tresund anthrazit");
+    expect(p.shape).toBe("sofa");
+    expect(p.dimensions).toEqual({ width: 2.28, depth: 0.95, height: 0.83 });
+    expect(p.colorName).toBe("Tresund anthrazit");
+    expect(p.color).toBe("#3d3f42");
+    expect(p.price).toBe(599);
+  });
+
+  it("Preis in verschiedenen Schreibweisen, Link optional", () => {
+    expect(parseProductText("Esstisch Lund\n€ 1.299,00\nMaße (B x T x H): 180 x 90 x 75 cm").price).toBe(1299);
+    const p = parseProductText("Couchtisch Oslo\n149,99 EUR\nB/H/T 110/40/60 cm", "https://www.shop.example/oslo");
+    expect(p).toMatchObject({ price: 149.99, shop: "shop.example", shape: "table", dimensions: { width: 1.1, height: 0.4, depth: 0.6 } });
   });
 });

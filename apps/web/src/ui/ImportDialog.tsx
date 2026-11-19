@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { Bookmark, CheckCircle2, ExternalLink, Link2, Loader2, Pipette, ShoppingBag, X } from "lucide-react";
+import { Bookmark, CheckCircle2, ClipboardPaste, ExternalLink, ImagePlus, Link2, Loader2, Pipette, ShoppingBag, X } from "lucide-react";
 import {
-  CATALOG, defaultDimensions, guessKind, productToCatalogEntry, shopName, type FurnitureShape, type ProductInfo,
+  CATALOG, defaultDimensions, guessKind, parseProductText, productToCatalogEntry, shopName, type FurnitureShape, type ProductInfo,
 } from "@raumwerk/core";
 import { usePlanStore } from "../store/planStore";
-import { bookmarkletCode, dominantColor, importProduct, ImportError, parseClipboardImport } from "../lib/importApi";
+import { bookmarkletCode, dominantColor, importProduct, ImportError, isShopUrl, parseClipboardImport, toThumbnail } from "../lib/importApi";
 import { formatPrice } from "../lib/format";
 
 export const SHAPE_LABELS: Record<FurnitureShape, string> = {
@@ -49,7 +49,7 @@ function formFor(p: ProductInfo): Form {
 /** Leeres Produkt für die manuelle Eingabe (Shop blockt, Server offline …). */
 function manualProduct(url: string): ProductInfo {
   const kind = guessKind("");
-  return { url: /^https?:\/\//.test(url) ? url : "https://example.invalid/", shop: shopName(url) || "manuell", name: "", dimensions: {}, ...kind };
+  return { url: /^https?:\/\//.test(url) ? url : "https://manuell.invalid/", shop: shopName(url) || "manuell", name: "", dimensions: {}, ...kind };
 }
 
 export function ImportDialog({ initial, onClose }: { initial?: ProductInfo | null; onClose: () => void }) {
@@ -61,6 +61,10 @@ export function ImportDialog({ initial, onClose }: { initial?: ProductInfo | nul
   const abort = useRef<AbortController | null>(null);
   const bookmarkRef = useRef<HTMLAnchorElement>(null);
   const [dragHint, setDragHint] = useState(false);
+  /** Vorschaubild, das mit dem Projekt gespeichert wird */
+  const [thumb, setThumb] = useState<string | undefined>(undefined);
+  const [imageBusy, setImageBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     // javascript:-URL per DOM setzen (React würde davor warnen)
@@ -74,16 +78,53 @@ export function ImportDialog({ initial, onClose }: { initial?: ProductInfo | nul
 
   const product = phase.kind === "review" ? phase.product : null;
 
-  // Farbe aus dem Produktfoto, wenn der Farbname nichts hergab
+  // Produktfoto als Vorschaubild sichern; Farbe daraus, wenn der Farbname nichts hergab
   useEffect(() => {
-    if (!product?.imageUrl || product.color) return;
+    setThumb(undefined);
+    if (!product?.imageUrl) return;
     let alive = true;
-    setColorBusy(true);
-    dominantColor(product.imageUrl).then((c) => {
-      if (alive && c) { setForm((f) => (f ? { ...f, color: c } : f)); setColorFromImage(true); }
-    }).finally(() => alive && setColorBusy(false));
+    setColorBusy(!product.color);
+    setImageBusy(true);
+    toThumbnail(product.imageUrl).then(async (t) => {
+      if (!alive) return;
+      if (t) setThumb(t);
+      if (!product.color) {
+        const c = await dominantColor(t ?? product.imageUrl!);
+        if (alive && c) { setForm((f) => (f ? { ...f, color: c } : f)); setColorFromImage(true); }
+      }
+    }).finally(() => { if (alive) { setColorBusy(false); setImageBusy(false); } });
     return () => { alive = false; };
   }, [product]);
+
+  /** Eigenes Bild (Datei, eingefügt, hineingezogen) → Vorschaubild + Farbe */
+  const applyImage = async (file: Blob) => {
+    setImageBusy(true);
+    try {
+      const t = await toThumbnail(file);
+      if (!t) return usePlanStore.getState().notify("Das Bild konnte nicht gelesen werden.");
+      setThumb(t);
+      if (!product?.colorName) {
+        const c = await dominantColor(t);
+        if (c) { setForm((f) => (f ? { ...f, color: c } : f)); setColorFromImage(true); }
+      }
+    } finally {
+      setImageBusy(false);
+    }
+  };
+
+  /** Kopierter Seitentext → Produktdaten */
+  const tryPageText = (text: string): boolean => {
+    const t = text.trim();
+    if (/^https?:\/\/\S+$/.test(t) || (t.length < 40 && !t.includes("\n"))) return false;
+    const p = parseProductText(t, /^https?:\/\//.test(url.trim()) ? url.trim() : undefined);
+    const d = p.dimensions;
+    if (!d.width && !d.depth && !d.height && p.name === "Importiertes Möbel") return false;
+    setUrl("");
+    setForm(formFor(p));
+    setColorFromImage(false);
+    setPhase({ kind: "review", product: p, warnings: d.width && d.depth && d.height ? [] : ["Nicht alle Maße im Text gefunden – bitte prüfen und ergänzen."] });
+    return true;
+  };
 
   /** Vom Lesezeichen kopierte Daten → direkt zur Prüfung */
   const tryClipboardData = (text: string): boolean => {
@@ -100,15 +141,22 @@ export function ImportDialog({ initial, onClose }: { initial?: ProductInfo | nul
   // Einfügen (Strg+V) irgendwo im Dialog
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => {
+      const file = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith("image/"));
+      if (file) {
+        e.preventDefault();
+        if (phase.kind !== "review") startManual();
+        void applyImage(file);
+        return;
+      }
       const text = e.clipboardData?.getData("text") ?? "";
-      if (tryClipboardData(text)) e.preventDefault();
+      if (tryClipboardData(text) || tryPageText(text)) e.preventDefault();
     };
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
   });
 
   const load = async () => {
-    if (tryClipboardData(url)) return;
+    if (tryClipboardData(url) || tryPageText(url)) return;
     const trimmed = url.trim();
     if (!/^https?:\/\/\S+\.\S+/.test(trimmed)) return setPhase({ kind: "link", error: "Bitte den kompletten Link zur Produktseite einfügen (beginnt mit https://).", code: "invalid" });
     abort.current = new AbortController();
@@ -144,6 +192,7 @@ export function ImportDialog({ initial, onClose }: { initial?: ProductInfo | nul
       height: measuredSame("height", height) ? undefined : height,
       color: form.color,
     });
+    if (thumb && entry.source) entry.source = { ...entry.source, imageData: thumb };
     usePlanStore.getState().importEntry(entry);
     onClose();
   };
@@ -175,7 +224,7 @@ export function ImportDialog({ initial, onClose }: { initial?: ProductInfo | nul
             <form className="import-link" onSubmit={(e) => { e.preventDefault(); void load(); }}>
               <label className="search grow">
                 <Link2 size={16} />
-                <input autoFocus type="text" inputMode="url" placeholder="https://www.shop.de/produkt/…" value={url} onChange={(e) => setUrl(e.target.value)} disabled={phase.kind === "loading"} />
+                <input autoFocus type="text" inputMode="url" placeholder="Link zur Produktseite – oder kopierten Seitentext einfügen" value={url} onChange={(e) => setUrl(e.target.value)} disabled={phase.kind === "loading"} />
               </label>
               <button className="btn primary" type="submit" disabled={phase.kind === "loading" || !url.trim()}>
                 {phase.kind === "loading" ? <><Loader2 className="spin" size={15} /> Lese Seite …</> : "Übernehmen"}
@@ -187,9 +236,13 @@ export function ImportDialog({ initial, onClose }: { initial?: ProductInfo | nul
                 <button className="chip small" onClick={startManual}>Maße selbst eintragen</button>
               </div>
             )}
+            <div className="import-alt">
+              <ClipboardPaste size={16} />
+              <span><strong>Klappt immer:</strong> Auf der Produktseite <kbd>Strg</kbd>+<kbd>A</kbd> und <kbd>Strg</kbd>+<kbd>C</kbd>, dann hier <kbd>Strg</kbd>+<kbd>V</kbd>. Maße, Preis und Name werden aus dem Text gelesen. Ein Produktbild kannst du danach per Rechtsklick „Bild kopieren“ und <kbd>Strg</kbd>+<kbd>V</kbd> ergänzen.</span>
+            </div>
             <div className="bookmarklet">
               <div>
-                <strong><Bookmark size={15} /> Für Shops, die blockieren: der Lesezeichen-Knopf</strong>
+                <strong><Bookmark size={15} /> Noch bequemer: der Lesezeichen-Knopf</strong>
                 <p className="muted small">1. Zieh den Knopf einmal in deine Lesezeichenleiste. 2. Auf der Produktseite im Shop anklicken, dann sind die Daten kopiert. 3. Hier mit Strg+V (Mac: Cmd+V) einfügen. Läuft komplett in deinem Browser.</p>
                 {dragHint && <p className="warn-text">Nicht klicken, sondern mit der Maus in die Lesezeichenleiste ziehen (Leiste einblenden: Strg+Shift+B).</p>}
               </div>
@@ -205,13 +258,27 @@ export function ImportDialog({ initial, onClose }: { initial?: ProductInfo | nul
           <>
             <div className="import-review">
               <div className="import-media">
-                {product.imageUrl ? (
-                  <img src={product.imageUrl} alt="" referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).style.visibility = "hidden"; }} />
-                ) : (
-                  <div className="import-placeholder" style={{ background: form.color }} />
-                )}
+                <div
+                  className="import-drop"
+                  onDragOver={(e) => { if ([...e.dataTransfer.items].some((i) => i.kind === "file")) e.preventDefault(); }}
+                  onDrop={(e) => {
+                    const f = [...e.dataTransfer.files].find((x) => x.type.startsWith("image/"));
+                    if (f) { e.preventDefault(); void applyImage(f); }
+                  }}
+                >
+                  {thumb || product.imageUrl ? (
+                    <img src={thumb ?? product.imageUrl} alt="" referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).style.visibility = "hidden"; }} />
+                  ) : (
+                    <div className="import-placeholder" style={{ background: form.color }}>
+                      <span>Produktbild hineinziehen oder mit Strg+V einfügen</span>
+                    </div>
+                  )}
+                  {imageBusy && <div className="import-busy"><Loader2 className="spin" size={20} /></div>}
+                </div>
+                <button className="chip small" onClick={() => fileRef.current?.click()}><ImagePlus size={13} /> {thumb || product.imageUrl ? "Bild ändern" : "Bild hinzufügen"}</button>
+                <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void applyImage(f); }} />
                 <div className="import-meta">
-                  {product.shop !== "manuell" && product.url && !product.url.includes("example.invalid") && (
+                  {isShopUrl(product.url) && (
                     <a href={product.url} target="_blank" rel="noopener noreferrer nofollow">{product.shop} <ExternalLink size={12} /></a>
                   )}
                   {product.price !== undefined && <strong>{formatPrice(product.price, product.currency)}</strong>}

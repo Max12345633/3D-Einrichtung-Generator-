@@ -52,6 +52,8 @@ export interface BackgroundImage {
   /** Position der linken oberen Bildecke in Metern */
   origin: Vec2;
   opacity: number;
+  /** true, sobald der Nutzer den Maßstab über zwei Punkte festgelegt hat */
+  calibrated?: boolean;
 }
 
 export type FloorMaterial = "oak-light" | "oak-dark" | "walnut" | "concrete" | "tiles-light" | "tiles-dark";
