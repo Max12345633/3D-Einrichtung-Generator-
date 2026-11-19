@@ -5,7 +5,7 @@
   "description": "Grundriss rein, 3D-Wohnung raus, einrichten, fotorealistisch rendern.",
   "workspaces": ["packages/*", "apps/*"],
   "scripts": {
-    "dev": "npm run dev -w @raumwerk/api & npm run dev -w @raumwerk/web",
+    "dev": "npm run dev -w @raumwerk/web",
     "dev:web": "npm run dev -w @raumwerk/web",
     "dev:api": "npm run dev -w @raumwerk/api",
     "build": "npm run build -w @raumwerk/core && npm run build -w @raumwerk/api && npm run build -w @raumwerk/web",

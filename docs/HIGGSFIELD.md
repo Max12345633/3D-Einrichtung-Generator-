@@ -1,4 +1,7 @@
-# Higgsfield-Anbindung
+# Higgsfield-Anbindung (optional, derzeit nicht genutzt)
+
+> **Stand:** Fotorealistische Bilder rendert die App inzwischen **selbst im Browser** (Path-Tracing + KI-Entrauschen, siehe `apps/web/src/viewer/photo.ts`).
+> Dieser Adapter bleibt als Option für später, z. B. für KI-„Restyling“ eines selbst gerenderten Bildes.
 
 Die Bildgenerierung läuft **ausschließlich über den Server** (`apps/api`). Der API-Key landet nie im Browser.
 

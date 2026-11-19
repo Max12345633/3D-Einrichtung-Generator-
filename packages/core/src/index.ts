@@ -9,3 +9,5 @@ export * from "./furniture";
 export * from "./plan";
 export * from "./prompt";
 export * from "./ops";
+export * from "./styles";
+export * from "./analysis";

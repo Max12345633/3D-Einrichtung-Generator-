@@ -1,6 +1,6 @@
 # Raumwerk: Grundriss → 3D-Wohnung → einrichten → Foto
 
-Web-App, mit der man aus einem Grundriss in Minuten eine begehbare 3D-Wohnung macht, sie per Drag & Drop einrichtet und mit KI (Higgsfield) fotorealistische Bilder erzeugt.
+Web-App, mit der man aus einem Grundriss in Minuten eine begehbare 3D-Wohnung macht, sie per Drag & Drop einrichtet und **fotorealistische Bilder direkt im Browser** berechnet – mit eigenem Path-Tracer und KI-Entrauschen, ohne externen Dienst.
 
 📄 **Ausführlicher Produkt- und Umsetzungsplan:** [`docs/PLAN.md`](docs/PLAN.md)
 
@@ -15,7 +15,9 @@ Web-App, mit der man aus einem Grundriss in Minuten eine begehbare 3D-Wohnung ma
 - **Möbelkatalog** (24 Teile): magnetisches Andocken an Wände, Kollisionswarnung, Drehen, Duplizieren, Farben
 - **3D-Ansicht** mit echten Wandöffnungen und Schatten, Möbel auch in 3D verschiebbar, „Wände niedrig“
 - **Rundgang** in Augenhöhe (WASD + Maus)
-- **Foto-Render** in 7 Stilen über Higgsfield (oder lokal per Mock)
+- **Fotorealistische Bilder, selbst gerendert:** GPU-Path-Tracing (indirektes Licht, weiche Schatten, Reflexionen), Portal-Lichter in Fenstern, Sonne aus Fensterrichtung, 3 Lichtstimmungen, bis 1920 × 1080, KI-Entrauschen (Open Image Denoise via WebGPU) mit Filter-Fallback
+- **7 Einrichtungsstile** (Skandinavisch, Japandi, Industrial …) als ein Klick auf Boden, Wände und Möbelfarben
+- **Echte Materialien:** prozedurale Holzdielen, Fliesen (Bad automatisch), Beton, Stoff mit Glanz, Lack, Metall, Keramik; Sockelleisten
 - Undo/Redo, automatisches Speichern im Browser, Projekt-Export/-Import (JSON), Tastenkürzel
 
 ## Schnellstart
@@ -27,18 +29,20 @@ npm install
 ```
 
 ```bash
-cp .env.example .env
-```
-
-```bash
 npm run dev
 ```
 
-Dann http://localhost:5173 öffnen. Ohne Higgsfield-Key läuft der Render im **Mock-Modus**: Er gibt die 3D-Vorlage zurück, damit der ganze Ablauf testbar ist.
+Dann http://localhost:5173 öffnen. Es wird **kein Server und kein API-Key** benötigt – alles läuft im Browser.
 
-### Higgsfield aktivieren
+### Foto-Render
 
-In `.env`: `RENDER_PROVIDER=higgsfield`, `HIGGSFIELD_API_KEY`, `HIGGSFIELD_API_SECRET` und `PUBLIC_BASE_URL` setzen. **Vorher die Checkliste in [`docs/HIGGSFIELD.md`](docs/HIGGSFIELD.md) abarbeiten**, denn Endpunkte und Feldnamen müssen gegen die aktuelle API-Doku geprüft werden.
+3D-Ansicht öffnen → Blickwinkel wählen (am schönsten im **Rundgang** auf Augenhöhe) → „Foto-Render“ → Stil, Licht, Qualität → „Bild berechnen“.
+Richtwerte auf einem aktuellen Laptop/Desktop mit Grafikkarte: Entwurf wenige Sekunden, HD ca. 10–40 s, Maximal ca. 1–2 min.
+Voraussetzung: WebGL2 (alle aktuellen Browser); für das KI-Entrauschen zusätzlich WebGPU (Chrome/Edge, Safari 18+).
+
+### Optional: externe Bild-KI (später)
+
+`apps/api` enthält einen vorbereiteten, **optionalen** Adapter für Higgsfield (siehe [`docs/HIGGSFIELD.md`](docs/HIGGSFIELD.md)). Er wird aktuell nicht genutzt.
 
 ## Tests und Build
 
@@ -58,8 +62,8 @@ npm run build
 
 ```
 packages/core   Datenmodell, Geometrie, Raumerkennung, Snapping, Kollision, Prompts (getestet)
-apps/web        React + three.js (react-three-fiber) Frontend
-apps/api        Hono-API: Render-Pipeline, Higgsfield-Adapter, Uploads, Rate-Limit
+apps/web        React + three.js (react-three-fiber) Frontend, Path-Tracer, Materialien
+apps/api        optional: Hono-API mit Higgsfield-Adapter (derzeit nicht genutzt)
 docs/           Plan, Architektur, Higgsfield
 ```
 

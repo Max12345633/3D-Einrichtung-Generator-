@@ -1,13 +1,14 @@
 # CLAUDE.md – Raumwerk
 
-3D-Einrichtungsplaner: Grundriss → 3D-Wohnung → einrichten → fotorealistisches Bild (Higgsfield).
+3D-Einrichtungsplaner: Grundriss → 3D-Wohnung → einrichten → fotorealistisches Bild (eigener Path-Tracer im Browser, kein externer Dienst).
 Produktplan: `docs/PLAN.md` · Architektur: `docs/ARCHITEKTUR.md` · Bild-KI: `docs/HIGGSFIELD.md`
 
 ## Befehle
 
 ```bash
 npm install            # einmalig (npm workspaces)
-npm run dev            # API (8787) + Web (5173, proxy /api)
+npm run dev            # Web (5173) – mehr braucht es nicht
+npm run dev:api        # optional: API (8787) für externe Bild-KI
 npm test               # vitest: core + api
 npm run typecheck      # alle Pakete
 npm run build          # core-Typcheck, API-Bundle (tsup), Web (vite)
@@ -23,14 +24,17 @@ npm run build          # core-Typcheck, API-Bundle (tsup), Web (vite)
 - UI-Texte auf Deutsch, Du-Form, kurz. Jede neue Interaktion braucht einen Hinweistext (`hintFor` im Editor).
 - Nach UI-Änderungen: App starten und mit Playwright einen Screenshot prüfen (2D, geteilt, 3D).
 - Neue Abhängigkeiten sparsam; three.js-Code nur in `apps/web/src/viewer` (lazy geladen).
+- Foto-Render: `viewer/photo.ts` (Path-Tracer, Licht-Setup), `viewer/denoise.ts` (OIDN/WebGPU), `viewer/materials.ts` (prozedurale Texturen).
+  Objekte, die nur in Echtzeit sichtbar sein sollen (Glas, Hilfsflächen, Echtzeit-Lichter), bekommen `userData={{ noPhoto: true }}`.
+- Foto-Render ohne GPU testen: `http://localhost:5173/?phototest=8` (nur Dev) rendert klein mit 8 Samples.
 
 ## Roadmap-Aufgaben (Phase 1, in dieser Reihenfolge)
 
-1. Higgsfield-Checkliste in `docs/HIGGSFIELD.md` abarbeiten (echte Antwort als Test-Fixture)
+1. Foto-Render: Albedo/Normal-Hilfsbilder für OIDN (bessere Texturdetails), Kamera-Presets pro Raum, Batch „alle Räume“
 2. Supabase: Auth (Magic Link + Google), Tabelle `projects` (jsonb plan), Storage für Renders, RLS
 3. Teilen-Links `/p/:slug` (read-only Viewer, OG-Image) – Router einführen (react-router)
-4. Stripe: Credits + Plus-Abo, Credit-Abzug serverseitig in `/api/render`
-5. Webhook statt Polling für Renders; Uploads → Cloudflare R2; Rate-Limit → Upstash Redis
+4. Stripe: Plus-Abo (HD/Max-Renders, Video, Cloud-Projekte)
+5. Video-Kamerafahrt (WebCodecs) für Social Media; Renders in der Cloud speichern (Supabase Storage/R2)
 6. Mobile: Touch-Pinch im 2D-Editor, Bottom-Sheet-Panels, Viewer-only-Modus
 7. GLB-Möbel (`modelUrl` im Katalog, Fallback prozedural), Raumtypen/-namen
 8. Landingpage, Impressum/Datenschutz/AGB, Plausible/PostHog, Sentry

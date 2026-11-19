@@ -31,7 +31,7 @@ Das Kernproblem ist die fehlende Vorstellungskraft. Menschen sehen einen Grundri
 Bestehende Tools wie Planner 5D, Roomle, IKEA Kreativ oder HomeByMe sind entweder CAD-lastig, an einen Händler gebunden oder liefern KI-Bilder ohne echte Maße. Unsere Positionierung:
 
 1. **Grundriss → 3D in Minuten.** Wir starten beim Foto oder PDF des Grundrisses, nicht bei einer leeren Fläche. Zuerst geführtes Nachzeichnen mit Maßstabs-Kalibrierung (fertig), danach **KI-Wanderkennung** (Phase 2).
-2. **Maßhaltig *und* fotorealistisch.** Die meisten KI-Einrichter halluzinieren Räume. Wir nutzen die **exakte 3D-Szene als Struktur-Vorlage** für die Bild-KI (Higgsfield). Wände, Fenster und Möbelpositionen bleiben stimmig.
+2. **Maßhaltig *und* fotorealistisch.** Die meisten KI-Einrichter halluzinieren Räume. Wir **rendern selbst** – physikalisch korrektes Path-Tracing im Browser mit KI-Entrauschen. Jedes Bild zeigt exakt die geplante Wohnung, ohne Kosten pro Bild und ohne Upload privater Grundrisse.
 3. **Magnetische Einrichtung.** Möbel docken automatisch an Wände an, Kollisionen werden rot markiert, und Flächen werden live berechnet. Laien machen dadurch keine „unmöglichen“ Pläne.
 4. **Rundgang statt nur Vogelperspektive.** Man kann in Augenhöhe durch die Wohnung laufen, der stärkste „Aha“-Moment.
 5. **Teilen als Kernfunktion.** Jeder Plan wird ein Link oder Clip für Instagram, TikTok und WhatsApp („So wird unsere neue Wohnung“). So entsteht organisches Wachstum.
@@ -68,20 +68,21 @@ UX-Prinzipien:
 - Grundriss-Bild hinterlegen und Maßstab kalibrieren
 - Möbelkatalog (24 Teile, 7 Kategorien), magnetische Wände, Kollisionserkennung, Drehen und Duplizieren
 - 3D-Ansicht: echte Wandöffnungen, Schatten, Möbel per Drag & Drop, „Wände niedrig“, Rundgang (WASD)
-- Foto-Render-Ablauf: Screenshot → API → Bild-Anbieter (Mock oder Higgsfield) → Polling → Download
+- Foto-Render im Browser: Path-Tracing, Portal-Lichter, 3 Lichtstimmungen, KI-Entrauschen, Galerie, Download
+- Prozedurale Materialien (Dielen, Fliesen, Beton, Stoff), Sockelleisten, 7 Einrichtungsstile
 - Undo/Redo, Speichern lokal und als JSON, Tastenkürzel, Startbildschirm
 
 ### Phase 1: MVP für den öffentlichen Launch (ca. 6–8 Wochen)
 - **Konten und Cloud-Speicher:** Supabase (Auth + Postgres + Storage, EU-Region). Projekte, Render-Historie.
 - **Teilen-Links:** `/p/{slug}` als öffentliche, schreibgeschützte 3D-Ansicht mit OG-Bild (Render oder Screenshot).
-- **Higgsfield live:** echte Keys, Webhook statt Polling, Credit-System, Moderation.
+- **Foto-Render ausbauen:** Kamera-Presets je Raum, „alle Räume rendern“, Wasserzeichen im Free-Plan, Galerie in der Cloud.
 - **Bezahlung:** Stripe (Checkout + Customer Portal), Credits und Abo.
 - **Mobile Viewer:** Touch-Orbit, Pinch-Zoom im 2D, Bottom-Sheet-UI.
 - **Echte Möbelmodelle:** GLB-Modelle (selbst modelliert oder lizenziert, z. B. CC0 von Poly Haven/Kenney oder gekaufte Pakete), mit Draco komprimiert, Lazy Loading. Das prozedurale Modell bleibt als Fallback.
 - **Raumnamen und -typen** (Wohnen, Schlafen, Bad …) für bessere Prompts und Statistiken.
 - **Export:** PNG des 2D-Plans (bemaßt), PDF-Grundriss.
 - **Analytics** (Plausible oder PostHog EU) und Fehler-Tracking (Sentry).
-- **Rechtliches:** Impressum, Datenschutzerklärung, AGB, Cookie-Banner nur falls nötig, AVV mit Higgsfield und Supabase.
+- **Rechtliches:** Impressum, Datenschutzerklärung, AGB, Cookie-Banner nur falls nötig, AVV mit Supabase (Grundrisse und Renders bleiben bis zum Cloud-Speichern auf dem Gerät).
 
 ### Phase 2: Der „Wow“-Vorsprung (ca. 2–3 Monate)
 - **KI-Grundrisserkennung:** Bild oder PDF rein, Wände, Türen und Fenster als Vektoren raus.
@@ -90,7 +91,7 @@ UX-Prinzipien:
   - Der Nutzer korrigiert anschließend im Editor. Das ist der Grund, warum der Editor so gut sein muss.
 - **Auto-Einrichten:** „Richte mein Wohnzimmer skandinavisch ein“ → Möbelvorschläge nach Regeln (Abstände, Laufwege, Tür-Schwenkbereiche) plus LLM-Planung → Ergebnis direkt editierbar.
 - **Stil-Varianten in Serie:** ein Klick → 4 Stile nebeneinander (Social-Content-Maschine).
-- **Video-Clips:** automatische Kamerafahrt durch die Wohnung als MP4 (WebCodecs) und optional Higgsfield-Video für animierte Renders. Perfekt für Reels und TikTok.
+- **Video-Clips:** automatische Kamerafahrt durch die Wohnung als MP4 (WebCodecs) (optional später KI-Video). Perfekt für Reels und TikTok.
 - **Eigene Möbel:** Maße eingeben („mein Sofa: 231 × 96 cm“), optional Foto → KI-Modell.
 
 ### Phase 3: Skalierung und B2B (ab Monat 6)
@@ -114,7 +115,7 @@ UX-Prinzipien:
 └──────────────┬─────────────────────────────────────┘
                │ /api (JSON)
 ┌──────────────▼──────────── apps/api (Hono, Node) ──┐
-│ /api/render  → validiert Plan → Prompt → Provider  │
+│ OPTIONAL · /api/render → Prompt → Provider         │
 │ /api/uploads → Referenzbild (Phase 1: R2/S3)       │
 │ Rate-Limit (Phase 1: Redis/Upstash)                │
 │ RenderProvider-Interface:                          │
@@ -126,7 +127,7 @@ UX-Prinzipien:
 
 **Warum so?**
 - **`core` ohne UI-Abhängigkeiten:** dieselbe Logik läuft im Browser, auf dem Server (Validierung, Prompt-Bau) und später in einem KI-Agenten („platziere ein Bett“). Alles Wichtige ist dort mit Unit-Tests abgesichert.
-- **Austauschbarer Bild-Anbieter:** kein Lock-in. Higgsfield ist Standard, Fallback-Anbieter oder ein eigener ControlNet-Server (Struktur-treues img2img) lassen sich über dasselbe Interface anbinden.
+- **Eigener Renderer statt Bild-API:** Path-Tracing + KI-Entrauschen laufen im Browser. Die optionale API mit Provider-Interface bleibt für spätere KI-Zusatzfunktionen.
 - **SVG für 2D:** gestochen scharf in jeder Zoomstufe, barrierearm, leicht zu exportieren. Bei sehr großen Plänen kann später auf Canvas umgestellt werden.
 - **Einheiten:** Meter überall; 2D-(x, y) entspricht 3D-(x, z).
 
@@ -134,7 +135,18 @@ UX-Prinzipien:
 
 Details: [`ARCHITEKTUR.md`](./ARCHITEKTUR.md) · Higgsfield: [`HIGGSFIELD.md`](./HIGGSFIELD.md)
 
-## 7. Higgsfield-Integration (Kurzfassung)
+## 7. Fotorealistische Bilder: eigener Renderer (umgesetzt)
+
+- **GPU-Path-Tracing im Browser** (three-gpu-pathtracer): indirektes Licht, weiche Schatten, Reflexionen.
+- **Licht wie in der Architektur-Visualisierung:** Portal-Lichter in jedem Fenster, Sonne aus der fensterreichsten Richtung, Raumleuchten; Stimmungen Tageslicht / Goldene Stunde / Abend.
+- **KI-Entrauschen** mit Intel Open Image Denoise (WebGPU), Fallback auf Kantenfilter.
+- **Vorteile:** keine Kosten pro Bild (→ großzügiger Free-Plan möglich), keine Abhängigkeit von Dritt-APIs, Grundrisse verlassen nie das Gerät (DSGVO-Pluspunkt fürs Marketing), Ergebnis ist maßhaltig.
+- **Grenzen:** Rechenzeit hängt vom Gerät ab (Handy langsamer → dort „Entwurf“ oder später Cloud-Render-Option); Möbel sind prozedural, bis GLB-Modelle kommen.
+
+## 7b. Optional später: Higgsfield-Integration (Kurzfassung)
+
+Für ein KI-„Restyling“ (z. B. Deko, Pflanzen, Stimmung) kann ein selbst gerendertes Bild optional an eine Bild-KI gehen. Der Adapter liegt vorbereitet in `apps/api`.
+
 
 1. Nutzer wählt in 3D den Blickwinkel → „Foto-Render“.
 2. Browser macht einen Screenshot (1600 px, JPEG) und schickt ihn mit Plan und Stil an `/api/render`.
@@ -142,20 +154,19 @@ Details: [`ARCHITEKTUR.md`](./ARCHITEKTUR.md) · Higgsfield: [`HIGGSFIELD.md`](.
 4. `HiggsfieldProvider.submit()` → Job-ID → Status per Polling (Phase 1: Webhook).
 5. Ergebnis → Anzeige, Download, später Galerie und Teilen-Link.
 
-Kostenkontrolle: Credits pro Nutzer, Rate-Limit pro IP/Konto, Caching identischer Anfragen, Moderation vor dem Senden.
-**Offen:** Die genauen Endpunkte und Feldnamen der Higgsfield-API sind konfigurierbar umgesetzt und müssen mit dem eigenen API-Zugang gegen die aktuelle Doku geprüft werden. Checkliste in `HIGGSFIELD.md`.
+Kostenkontrolle (falls aktiviert): Credits pro Nutzer, Rate-Limit, Caching. Checkliste in `HIGGSFIELD.md`.
 
 ## 8. Geschäftsmodell
 
 | Plan | Preis (Hypothese) | Inhalt |
 |------|------------------|--------|
-| **Free** | 0 € | unbegrenzt planen, 3D und Rundgang, 3 Foto-Renders/Monat (Wasserzeichen), 1 Cloud-Projekt |
-| **Plus** | 7,99 €/Monat oder 49 €/Jahr | 60 Renders/Monat in HD ohne Wasserzeichen, unbegrenzt Projekte, Video-Clips, Stil-Serien |
-| **Credits** | 4,99 € für 20 Renders | für Einmal-Umzügler (oft die beste Conversion) |
+| **Free** | 0 € | unbegrenzt planen, 3D und Rundgang, Foto-Renders in Entwurf/HD mit Wasserzeichen, 1 Cloud-Projekt |
+| **Plus** | 7,99 €/Monat oder 49 €/Jahr | Renders in Maximal-Qualität ohne Wasserzeichen, unbegrenzt Projekte, Video-Clips, Stil-Serien |
+| **Umzugs-Pass** | 9,99 € einmalig (3 Monate Plus) | für Einmal-Umzügler (oft die beste Conversion) |
 | **Pro/Makler** | ab 49 €/Monat | Branding, Exposé-Export, Home-Staging, Einbettung, Team |
 
 Weitere Erlösquellen: Affiliate (Möbel), Leads für Handwerker oder Küchenstudios (Phase 3).
-**Unit Economics prüfen:** Kosten pro Render (Higgsfield-Preis × Versuche) müssen deutlich unter 0,25 € liegen, damit „Plus“ profitabel ist. Sonst die Render-Kontingente anpassen.
+**Unit Economics:** Da die Bilder auf dem Gerät der Nutzer gerendert werden, entstehen **keine variablen Render-Kosten** – die Marge hängt nur an Hosting/Speicher.
 
 ## 9. Go-to-Market über Social Media
 
@@ -186,10 +197,8 @@ Weitere Erlösquellen: Affiliate (Möbel), Leads für Handwerker oder Küchenstu
 
 | Risiko | Gegenmaßnahme |
 |--------|----------------|
-| KI-Bilder weichen vom Raum ab (Fenster falsch, Möbel erfunden) | Struktur-Referenz plus präziser Prompt aus echten Möbeln; Anbieter austauschbar; optional ControlNet (Tiefe/Kanten) als eigener Dienst |
-| Render-Kosten fressen Marge | Credits, Rate-Limits, Caching, kleinere Vorschau-Renders vor dem HD-Render |
+| Render-Zeit auf schwachen Geräten | Qualitätsstufen, KI-Entrauschen (weniger Samples nötig), später optionaler Cloud-Render |
 | Grundrisserkennung ungenau | Editor bleibt Kern; Erkennung als „Vorschlag“; Nutzerkorrekturen (mit Einwilligung) als Trainingsdaten |
-| Abhängigkeit von Higgsfield (API-Änderungen, Preise) | Provider-Interface, tolerante Antwortauswertung, zweiter Anbieter vorbereitet |
 | Urheberrecht an Grundrissen (Exposés, Architektenpläne) | Nutzer versichert Rechte; Bilder bleiben privat; Galerie nur mit Opt-in |
 | DSGVO | EU-Hosting, Datensparsamkeit, AVVs, keine Grundrisse in Logs, Löschfunktion |
 | Performance auf schwachen Handys | prozedurale Low-Poly-Modelle, LOD, Schatten abschaltbar, `dpr`-Begrenzung |
@@ -199,7 +208,7 @@ Weitere Erlösquellen: Affiliate (Möbel), Leads für Handwerker oder Küchenstu
 | Woche | Meilenstein |
 |-------|-------------|
 | 0 ✅ | Fundament: Editor, 3D, Rundgang, Render-Pipeline (dieses Repo) |
-| 1–2 | Higgsfield-Zugang verifizieren, Prompt-Tuning mit 50 Testbildern, Webhooks |
+| 1–2 ✅ | Eigener Foto-Renderer (Path-Tracing, KI-Entrauschen), Materialien, Stile |
 | 2–4 | Supabase (Auth, Projekte, Storage), Teilen-Links mit OG-Bildern, Stripe |
 | 4–6 | Mobile Viewer und Touch-Bedienung, GLB-Möbel (~60 Modelle), Raumtypen |
 | 6–8 | Landingpage, Rechtliches, Analytics, Beta mit Warteliste, erste Creator |
@@ -208,13 +217,13 @@ Weitere Erlösquellen: Affiliate (Möbel), Leads für Handwerker oder Küchenstu
 
 ## 13. Team und Budget (Orientierung)
 
-- **Solo mit Claude Code:** Phase 1 ist realistisch. Laufende Kosten am Anfang: Hosting 0–50 €/Monat, Supabase 25 €/Monat, Higgsfield nutzungsabhängig.
+- **Solo mit Claude Code:** Phase 1 ist realistisch. Laufende Kosten am Anfang: Hosting 0–50 €/Monat, Supabase 25 €/Monat.
 - **Sinnvolle Ergänzungen:** 3D-Artist (Freelance, Möbelmodelle), Content-Creator:in für Social Media.
-- **Größter Kostentreiber:** Render-Kosten. Deshalb Credits von Anfang an.
+- **Kein Render-Kostenblock:** Bilder entstehen auf dem Gerät der Nutzer.
 
 ## 14. Nächste konkrete Schritte
 
 1. Lokal starten (`README.md`) und die Beispielwohnung ausprobieren.
-2. Higgsfield-API-Zugang besorgen und die Checkliste in `docs/HIGGSFIELD.md` abarbeiten.
+2. Foto-Render auf dem eigenen Rechner ausprobieren (Rundgang → Foto-Render → HD).
 3. Namen und Domain festlegen und eine Warteliste-Landingpage aufsetzen.
 4. Mit Claude Code Phase 1 Punkt für Punkt umsetzen. Die Aufgaben stehen in `CLAUDE.md` unter „Roadmap-Aufgaben“.

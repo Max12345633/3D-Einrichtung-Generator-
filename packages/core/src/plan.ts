@@ -22,6 +22,7 @@ export const planSchema = z.object({
     color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   })).max(2000),
   floorColor: z.string(),
+  floorMaterial: z.enum(["oak-light", "oak-dark", "walnut", "concrete", "tiles-light", "tiles-dark"]).optional(),
   wallColor: z.string(),
   background: z.object({
     dataUrl: z.string(), widthPx: z.number().positive(), heightPx: z.number().positive(), metersPerPixel: z.number().positive(), origin: vec2, opacity: z.number().min(0).max(1),
@@ -37,7 +38,7 @@ export function parsePlan(data: unknown): Plan {
 export function emptyPlan(name = "Meine Wohnung"): Plan {
   return {
     version: 1, id: createId("plan"), name, walls: [], openings: [], furniture: [],
-    floorColor: "#cdb293", wallColor: "#f3f1ec", updatedAt: new Date().toISOString(),
+    floorColor: "#cdb293", floorMaterial: "oak-light", wallColor: "#f3f1ec", updatedAt: new Date().toISOString(),
   };
 }
 

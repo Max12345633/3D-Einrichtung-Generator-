@@ -1,15 +1,11 @@
 import { useMemo } from "react";
 import { Copy, RotateCw, Trash2 } from "lucide-react";
 import {
-  CATALOG_BY_ID, detectRooms, setWallLength, updateOpening, updateWall, updateFurniture, wallLength,
+  CATALOG_BY_ID, FLOOR_MATERIALS, INTERIOR_STYLES, STYLE_IDS, applyStyle, detectRooms, setWallLength, updateOpening, updateWall, updateFurniture, wallLength,
 } from "@raumwerk/core";
 import { normalizeAngle, usePlanStore } from "../store/planStore";
 import { formatArea, formatCm } from "../lib/format";
 
-const FLOORS = [
-  { label: "Eiche hell", value: "#cdb293" }, { label: "Eiche dunkel", value: "#8a6a4b" }, { label: "Beton", value: "#b9b6b0" },
-  { label: "Fliese hell", value: "#e7e4de" }, { label: "Nussbaum", value: "#6b4a33" },
-];
 const WALLS = [
   { label: "Weiß", value: "#f3f1ec" }, { label: "Greige", value: "#ddd5c8" }, { label: "Salbei", value: "#c9d3c0" },
   { label: "Nebelblau", value: "#cfd8de" }, { label: "Terrakotta", value: "#d7b4a0" },
@@ -95,9 +91,19 @@ export function Inspector() {
       </div>
       <p className="muted small">* Netto-Innenfläche aus geschlossenen Räumen, ohne Abzüge nach WoFlV.</p>
 
-      <Field label="Boden">
+      <Field label="Einrichtungsstil">
+        <div className="style-grid">
+          {STYLE_IDS.map((id) => (
+            <button key={id} className="chip small" onClick={() => commit((p) => applyStyle(p, id))} title="Boden, Wände und Möbelfarben anpassen (Strg+Z macht es rückgängig)">
+              <span className="style-dots">{INTERIOR_STYLES[id].fabric.slice(0, 2).concat(INTERIOR_STYLES[id].wood).map((c) => <i key={c} style={{ background: c }} />)}</span>
+              {INTERIOR_STYLES[id].label}
+            </button>
+          ))}
+        </div>
+      </Field>
+      <Field label={`Boden · ${FLOOR_MATERIALS.find((f) => f.id === (plan.floorMaterial ?? "oak-light"))?.label}`}>
         <div className="swatches">
-          {FLOORS.map((c) => <button key={c.value} title={c.label} className={`swatch-btn ${plan.floorColor === c.value ? "is-active" : ""}`} style={{ background: c.value }} onClick={() => commit((p) => ({ ...p, floorColor: c.value }))} />)}
+          {FLOOR_MATERIALS.map((f) => <button key={f.id} title={f.label} className={`swatch-btn ${(plan.floorMaterial ?? "oak-light") === f.id ? "is-active" : ""}`} style={{ background: f.swatch }} onClick={() => commit((p) => ({ ...p, floorMaterial: f.id }))} />)}
         </div>
       </Field>
       <Field label="Wände">

@@ -3,14 +3,18 @@ import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber"
 import { ContactShadows, OrbitControls, PointerLockControls } from "@react-three/drei";
 import * as THREE from "three";
 import {
-  CATALOG_BY_ID, boundsOf, clampOpening, detectRooms, findCollisions, pointInPolygon, pointOnWall, projectOnSegment, snapFurnitureToWall,
-  updateFurniture, wallAngle, wallBoxes, type Opening, type Plan, type Wall,
+  CATALOG_BY_ID, boundsOf, clampOpening, classifyRoom, detectRooms, findCollisions, pointInPolygon, pointOnWall, projectOnSegment, snapFurnitureToWall,
+  updateFurniture, wallAngle, wallBoxes, type FloorMaterial, type Opening, type Plan, type Wall,
 } from "@raumwerk/core";
 import { usePlanStore } from "../store/planStore";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { FurnitureMesh } from "./FurnitureMesh";
+import { floorMaterial, material } from "./materials";
+import { polygonGeometry } from "./geometry";
 
-/** Wird von der Render-Funktion genutzt, um einen Screenshot der 3D-Ansicht zu holen. */
+/** Wird vom Foto-Dialog genutzt: Screenshot bzw. Zugriff auf Szene und Kamera für den Path-Tracer. */
 export const viewportCapture: { current: (() => string | null) | null } = { current: null };
+export const viewportScene: { current: { scene: THREE.Scene; camera: THREE.Camera } | null } = { current: null };
 
 export function Viewer3D() {
   const plan = usePlanStore((s) => s.plan);
@@ -29,7 +33,7 @@ export function Viewer3D() {
       >
         <color attach="background" args={["#f1f2ef"]} />
         <Suspense fallback={null}>
-          <Scene plan={plan} cutaway={cutaway && !walkMode} onDragChange={setDragging} />
+          <Scene plan={plan} cutaway={cutaway && !walkMode} ceiling={walkMode} onDragChange={setDragging} />
         </Suspense>
         <CaptureBridge />
         {walkMode ? <WalkControls plan={plan} /> : <OrbitRig plan={plan} enabled={!dragging} />}
@@ -56,7 +60,8 @@ function CaptureBridge() {
       gl.render(scene, camera);
       return gl.domElement.toDataURL("image/png");
     };
-    return () => { viewportCapture.current = null; };
+    viewportScene.current = { scene, camera };
+    return () => { viewportCapture.current = null; viewportScene.current = null; };
   }, [gl, scene, camera]);
   return null;
 }
@@ -165,12 +170,26 @@ function WalkControls({ plan }: { plan: Plan }) {
   return <PointerLockControls selector=".viewer3d canvas" onLock={() => keys.current.clear()} />;
 }
 
-function Scene({ plan, cutaway, onDragChange }: { plan: Plan; cutaway: boolean; onDragChange: (d: boolean) => void }) {
+/** Weiche Studio-Umgebung für Reflexionen (ohne externe HDR-Datei). */
+function RealtimeEnvironment() {
+  const { gl, scene } = useThree();
+  useEffect(() => {
+    const pmrem = new THREE.PMREMGenerator(gl);
+    const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.environment = env;
+    scene.environmentIntensity = 0.32;
+    return () => { scene.environment = null; env.dispose(); pmrem.dispose(); };
+  }, [gl, scene]);
+  return null;
+}
+
+function Scene({ plan, cutaway, ceiling, onDragChange }: { plan: Plan; cutaway: boolean; ceiling: boolean; onDragChange: (d: boolean) => void }) {
   const selection = usePlanStore((s) => s.selection);
   const snapping = usePlanStore((s) => s.snapping);
   const tool = usePlanStore((s) => s.tool);
   const { select, beginGesture, live } = usePlanStore.getState();
   const rooms = useMemo(() => detectRooms(plan.walls), [plan.walls]);
+  const roomKinds = useMemo(() => new Map(rooms.map((r) => [r.id, classifyRoom(r, plan)])), [rooms, plan.furniture]); // eslint-disable-line react-hooks/exhaustive-deps
   const collisions = useMemo(() => findCollisions(plan.furniture), [plan.furniture]);
   const dragId = useRef<string | null>(null);
   const center = useMemo(() => planCenter(plan), [plan]);
@@ -198,11 +217,13 @@ function Scene({ plan, cutaway, onDragChange }: { plan: Plan; cutaway: boolean; 
 
   return (
     <>
-      <hemisphereLight args={["#ffffff", "#e2d6c6", 1.15]} />
-      <ambientLight intensity={0.35} />
+      <RealtimeEnvironment />
+      <hemisphereLight args={["#ffffff", "#d9cdbd", 0.55]} />
+      <ambientLight intensity={0.12} />
       <directionalLight
+        userData={{ noPhoto: true }}
         position={[center.cx + 6, 14, center.cz + 4]}
-        intensity={1.9}
+        intensity={1.5}
         castShadow
         shadow-mapSize={[2048, 2048]}
         shadow-camera-left={-center.span}
@@ -217,10 +238,15 @@ function Scene({ plan, cutaway, onDragChange }: { plan: Plan; cutaway: boolean; 
       {/* Boden: Räume als eigene Flächen, darunter eine neutrale Grundplatte */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[center.cx, -0.01, center.cz]} receiveShadow onPointerMove={onFloorMove} onPointerDown={(e) => { if (tool === "select" && !dragId.current && e.button === 0) select(null); }}>
         <planeGeometry args={[center.span * 4, center.span * 4]} />
-        <meshStandardMaterial color="#e3e5e1" roughness={1} />
+        <meshStandardMaterial color="#dcdcd6" roughness={1} />
       </mesh>
-      {rooms.map((r) => <RoomFloor key={r.id} polygon={r.polygon} color={plan.floorColor} onPointerMove={onFloorMove} />)}
-      <ContactShadows position={[center.cx, 0.002, center.cz]} scale={center.span * 1.6} opacity={0.35} blur={2.5} far={3} />
+      {rooms.map((r) => (
+        <RoomFloor key={r.id} polygon={r.polygon} material={floorMaterial(roomKinds.get(r.id) === "bath" ? bathFloor(plan.floorMaterial) : plan.floorMaterial)} onPointerMove={onFloorMove} />
+      ))}
+      {ceiling && rooms.map((r) => <Ceiling key={`c${r.id}`} polygon={r.polygon} height={Math.min(...plan.walls.map((w) => w.height))} />)}
+      <group userData={{ noPhoto: true }}>
+        <ContactShadows position={[center.cx, 0.002, center.cz]} scale={center.span * 1.6} opacity={0.3} blur={2.5} far={3} />
+      </group>
 
       {walls.map((w) => (
         <WallMesh
@@ -264,31 +290,51 @@ function Scene({ plan, cutaway, onDragChange }: { plan: Plan; cutaway: boolean; 
   );
 }
 
-function RoomFloor({ polygon, color, onPointerMove }: { polygon: { x: number; y: number }[]; color: string; onPointerMove: (e: ThreeEvent<PointerEvent>) => void }) {
-  const geometry = useMemo(() => {
-    const shape = new THREE.Shape(polygon.map((p) => new THREE.Vector2(p.x, p.y)));
-    const g = new THREE.ShapeGeometry(shape);
-    g.rotateX(Math.PI / 2); // (x, y, 0) → (x, 0, y)
-    return g;
-  }, [polygon]);
+/** Im Bad Fliesen – außer der Hauptboden ist schon gefliest. */
+export function bathFloor(main: FloorMaterial | undefined): FloorMaterial {
+  return main === "tiles-light" ? "tiles-dark" : "tiles-light";
+}
+
+function Ceiling({ polygon, height }: { polygon: { x: number; y: number }[]; height: number }) {
+  const geometry = useMemo(() => polygonGeometry(polygon, height), [polygon, height]);
   useEffect(() => () => geometry.dispose(), [geometry]);
   return (
-    <mesh geometry={geometry} receiveShadow onPointerMove={onPointerMove}>
-      <meshStandardMaterial color={color} roughness={0.75} side={THREE.DoubleSide} />
+    <mesh geometry={geometry} userData={{ noPhoto: true }}>
+      <meshStandardMaterial color="#fbfaf7" roughness={0.95} side={THREE.DoubleSide} />
     </mesh>
   );
 }
 
+function RoomFloor({ polygon, material: mat, onPointerMove }: { polygon: { x: number; y: number }[]; material: THREE.Material; onPointerMove: (e: ThreeEvent<PointerEvent>) => void }) {
+  const geometry = useMemo(() => polygonGeometry(polygon, 0.001), [polygon]);
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  // Normale zeigt nach dem Drehen nach unten → Material beidseitig; im Path-Tracer ebenso
+  useEffect(() => { mat.side = THREE.DoubleSide; }, [mat]);
+  return <mesh geometry={geometry} material={mat} receiveShadow onPointerMove={onPointerMove} />;
+}
+
 function WallMesh({ wall, openings, color, selected, onSelect }: { wall: Wall; openings: Opening[]; color: string; selected: boolean; onSelect: () => void }) {
   const boxes = useMemo(() => wallBoxes(wall, openings, true), [wall, openings]);
+  const wallMat = material("wall", selected ? "#cfe5dd" : color);
+  const skirting = material("baseboard", "#f7f6f2");
   return (
     <group onPointerDown={(e) => { if (e.button === 0) { e.stopPropagation(); onSelect(); } }}>
-      {boxes.map((b, i) => (
-        <mesh key={i} position={b.center} rotation={[0, b.rotationY, 0]} castShadow receiveShadow>
-          <boxGeometry args={b.size} />
-          <meshStandardMaterial color={selected ? "#cfe5dd" : color} roughness={0.92} />
-        </mesh>
-      ))}
+      {boxes.map((b, i) => {
+        const bottom = b.center[1] - b.size[1] / 2;
+        return (
+          <group key={i}>
+            <mesh position={b.center} rotation={[0, b.rotationY, 0]} material={wallMat} castShadow receiveShadow>
+              <boxGeometry args={b.size} />
+            </mesh>
+            {/* Sockelleiste beidseitig an allen Stücken, die auf dem Boden stehen (nicht in Türöffnungen) */}
+            {bottom < 0.001 && b.size[1] > 0.3 && (
+              <mesh position={[b.center[0], 0.035, b.center[2]]} rotation={[0, b.rotationY, 0]} material={skirting} receiveShadow>
+                <boxGeometry args={[b.size[0], 0.07, b.size[2] + 0.024]} />
+              </mesh>
+            )}
+          </group>
+        );
+      })}
     </group>
   );
 }
@@ -299,20 +345,18 @@ function OpeningMesh({ opening, wall }: { opening: Opening; wall: Wall }) {
   if (opening.kind === "window") {
     return (
       <group position={[c.x, opening.sill, c.y]} rotation={[0, rot, 0]}>
-        <mesh position={[0, opening.height / 2, 0]}>
+        {/* Glas nur in Echtzeit – im Foto-Render würde es das Sonnenlicht unnötig verrauschen */}
+        <mesh position={[0, opening.height / 2, 0]} material={material("glass", "#dbeef5")} userData={{ noPhoto: true }}>
           <boxGeometry args={[opening.width, opening.height, 0.02]} />
-          <meshPhysicalMaterial color="#cfe6f2" transmission={0.9} roughness={0.05} transparent opacity={0.35} />
         </mesh>
         {/* Rahmen */}
         {[[0, 0.02, opening.width, 0.04], [0, opening.height - 0.02, opening.width, 0.04], [-opening.width / 2 + 0.02, opening.height / 2, 0.04, opening.height], [opening.width / 2 - 0.02, opening.height / 2, 0.04, opening.height], [0, opening.height / 2, 0.04, opening.height]].map(([x, y, w, h], i) => (
-          <mesh key={i} position={[x!, y!, 0]}>
+          <mesh key={i} position={[x!, y!, 0]} material={material("lacquer", "#f7f7f5")} castShadow>
             <boxGeometry args={[w!, h!, 0.07]} />
-            <meshStandardMaterial color="#f7f7f5" roughness={0.5} />
           </mesh>
         ))}
-        <mesh position={[0, -0.02, 0.06]}>
-          <boxGeometry args={[opening.width + 0.04, 0.03, 0.18]} />
-          <meshStandardMaterial color="#e9e6df" />
+        <mesh position={[0, -0.02, 0]} material={material("lacquer", "#ebe8e1")} castShadow receiveShadow>
+          <boxGeometry args={[opening.width + 0.04, 0.03, wall.thickness + 0.06]} />
         </mesh>
       </group>
     );
@@ -322,15 +366,13 @@ function OpeningMesh({ opening, wall }: { opening: Opening; wall: Wall }) {
   return (
     <group position={[c.x, 0, c.y]} rotation={[0, rot, 0]}>
       {[[-opening.width / 2, opening.height / 2, 0.04, opening.height], [opening.width / 2, opening.height / 2, 0.04, opening.height], [0, opening.height, opening.width + 0.08, 0.04]].map(([x, y, w, h], i) => (
-        <mesh key={i} position={[x!, y!, 0]} castShadow>
+        <mesh key={i} position={[x!, y!, 0]} material={material("lacquer", "#f4f3ef")} castShadow>
           <boxGeometry args={[w!, h!, t + 0.02]} />
-          <meshStandardMaterial color="#f4f3ef" roughness={0.5} />
         </mesh>
       ))}
       <group position={[-opening.width / 2 + 0.02, 0, t / 2]} rotation={[0, -1.1, 0]}>
-        <mesh position={[(opening.width - 0.04) / 2, (opening.height - 0.01) / 2, 0.02]} castShadow>
+        <mesh position={[(opening.width - 0.04) / 2, (opening.height - 0.01) / 2, 0.02]} material={material("lacquer", "#faf9f6")} castShadow>
           <boxGeometry args={[opening.width - 0.04, opening.height - 0.01, 0.04]} />
-          <meshStandardMaterial color="#faf9f6" roughness={0.45} />
         </mesh>
       </group>
     </group>

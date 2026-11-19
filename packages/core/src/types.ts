@@ -52,6 +52,8 @@ export interface BackgroundImage {
   opacity: number;
 }
 
+export type FloorMaterial = "oak-light" | "oak-dark" | "walnut" | "concrete" | "tiles-light" | "tiles-dark";
+
 export interface Plan {
   version: 1;
   id: string;
@@ -59,7 +61,9 @@ export interface Plan {
   walls: Wall[];
   openings: Opening[];
   furniture: FurnitureItem[];
+  /** Legacy-Farbton; maßgeblich ist floorMaterial */
   floorColor: string;
+  floorMaterial?: FloorMaterial;
   wallColor: string;
   background?: BackgroundImage;
   updatedAt: string;

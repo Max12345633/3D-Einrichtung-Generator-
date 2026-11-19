@@ -19,11 +19,14 @@ apps/web/              React-Frontend
   src/store/planStore.ts   Zustand: Plan, Undo/Redo (Gesten), Werkzeuge, Persistenz (localStorage)
   src/editor/Editor2D.tsx  SVG-Editor (Kamera, Werkzeuge, Drag, Vorschauen, Kalibrierung)
   src/viewer/Viewer3D.tsx  three.js-Szene, Orbit/Rundgang, 3D-Drag, Screenshot-Bridge
-  src/viewer/FurnitureMesh.tsx  Prozedurale Möbel (später GLB)
+  src/viewer/FurnitureMesh.tsx  Prozedurale Möbel (abgerundete Polster, später GLB)
+  src/viewer/materials.ts  Prozedurale Texturen (Dielen, Fliesen, Beton, Stoff, Putz) + Materialien je Rolle
+  src/viewer/photo.ts      Foto-Render: GPU-Path-Tracer (three-gpu-pathtracer), Portal-/Raum-/Sonnenlicht, Nachbearbeitung
+  src/viewer/denoise.ts    KI-Entrauschen (Open Image Denoise über WebGPU, oidn-web) – Gewichte in public/oidn/
   src/ui/                  TopBar, LeftPanel (Werkzeuge + Katalog), Inspector, StartScreen, RenderDialog
   src/lib/                 API-Client, Datei-Helfer, Formatierung, Tastenkürzel
 
-apps/api/              Hono-Server (Node; läuft auch auf Cloudflare Workers/Bun)
+apps/api/              OPTIONAL – Hono-Server für externe Bild-KI (derzeit nicht genutzt)
   src/app.ts           Routen: /api/health, /api/render, /api/render/:id, /api/uploads/:id
   src/providers/       RenderProvider-Interface, MockProvider, HiggsfieldProvider
   src/uploads.ts       Flüchtiger Bildspeicher (→ R2/S3)
@@ -47,3 +50,19 @@ Pointer-Event (2D/3D) ─► Store-Action ─► core-Operation (pure) ─► ne
 Plan ─► useMemo(detectRooms / findCollisions / wallBoxes) ─► SVG + three.js rendern
 Plan ─► persist (localStorage, später Supabase)
 ```
+
+## Foto-Render (Pipeline)
+
+```
+Live-Szene (react-three-fiber)
+  └─ prepareScene(): Decke (bei Innenkamera), Portal-Lichter je Fenster, Raum-Flächenlichter,
+                     Sonne aus dominantWindowDirection(), Verlaufshimmel; noPhoto-Objekte ausblenden
+  └─ WebGLPathTracer.setScene()  (BVH, Materialien, Lichter werden kopiert)
+  └─ Szene sofort wiederherstellen (synchron → Live-Ansicht unverändert)
+  └─ renderSample() × N  (Fortschritt + Live-Canvas im Dialog)
+  └─ Entrauschen: OIDN (WebGPU)  |  Fallback: kantenerhaltender Filter (DenoiseMaterial)
+  └─ Feinschliff (Kontrast, Vignette) → JPEG
+```
+
+Wichtig: Der Path-Tracer unterstützt Rect-, Punkt-, Spot- und Richtungslichter, aber **keine** Hemisphären-/Ambient-Lichter
+und **keine** PMREM-Umgebungen – deshalb das eigene Licht-Setup in `photo.ts`.

@@ -5,11 +5,11 @@ import { TopBar } from "./ui/TopBar";
 import { LeftPanel } from "./ui/LeftPanel";
 import { Inspector } from "./ui/Inspector";
 import { StartScreen } from "./ui/StartScreen";
-import { RenderDialog } from "./ui/RenderDialog";
 import { useShortcuts } from "./lib/useShortcuts";
 
 // three.js ist groß → erst laden, wenn die 3D-Ansicht gebraucht wird
 const Viewer3D = lazy(() => import("./viewer/Viewer3D").then((m) => ({ default: m.Viewer3D })));
+const RenderDialog = lazy(() => import("./ui/RenderDialog").then((m) => ({ default: m.RenderDialog })));
 
 export function App() {
   const view = usePlanStore((s) => s.view);
@@ -33,7 +33,7 @@ export function App() {
         <Inspector />
       </div>
       {!onboarded && <StartScreen />}
-      {renderOpen && <RenderDialog onClose={() => setRenderOpen(false)} />}
+      {renderOpen && <Suspense fallback={null}><RenderDialog onClose={() => setRenderOpen(false)} /></Suspense>}
     </div>
   );
 }

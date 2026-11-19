@@ -1,17 +1,10 @@
 import { CATALOG_BY_ID } from "./catalog";
 import type { Plan } from "./types";
+import { INTERIOR_STYLES, type StyleId } from "./styles";
 
-export const RENDER_STYLES = {
-  skandinavisch: { label: "Skandinavisch", prompt: "Scandinavian interior, light oak wood, white walls, soft wool textiles, airy and calm" },
-  modern: { label: "Modern", prompt: "contemporary modern interior, clean lines, neutral palette, matte finishes, designer lighting" },
-  japandi: { label: "Japandi", prompt: "Japandi interior, warm minimalism, natural materials, linen, low furniture, muted earth tones" },
-  industrial: { label: "Industrial", prompt: "industrial loft interior, exposed concrete, black steel, leather, warm Edison lighting" },
-  landhaus: { label: "Landhaus", prompt: "modern country house interior, rustic wood, cosy fabrics, warm cream tones" },
-  luxus: { label: "Luxus", prompt: "luxury interior, marble, brass accents, velvet upholstery, elegant statement lighting" },
-  boho: { label: "Boho", prompt: "bohemian interior, rattan, plants, layered patterned rugs, warm terracotta tones" },
-} as const;
-
-export type RenderStyle = keyof typeof RENDER_STYLES;
+/** Für optionale externe Bild-KIs (z. B. Higgsfield) – die Stile kommen aus styles.ts. */
+export const RENDER_STYLES = INTERIOR_STYLES;
+export type RenderStyle = StyleId;
 
 export interface PromptInput {
   plan: Plan;
